@@ -1,0 +1,132 @@
+<idea-plugin>
+    <id>com.github.localstack.s3browser</id>
+    <name>LocalStack S3 Browser</name>
+    <vendor>LocalStack S3 Browser</vendor>
+
+    <description><![CDATA[
+    Browse and manage S3 buckets running in LocalStack directly from IntelliJ IDEA.
+
+    <h3>Features:</h3>
+    <ul>
+        <li>Connect to LocalStack S3 endpoint</li>
+        <li>Browse buckets and objects in a tree view</li>
+        <li>Open and edit S3 files in the IDE editor</li>
+        <li>Create, delete, rename, and move files</li>
+        <li>Create and delete buckets</li>
+        <li>Drag and drop files to upload</li>
+        <li>Project-level and application-level settings</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Application-level settings -->
+        <applicationService
+                serviceImplementation="com.github.localstack.s3browser.settings.S3BrowserAppSettings"/>
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.github.localstack.s3browser.settings.S3BrowserAppConfigurable"
+                id="com.github.localstack.s3browser.settings.S3BrowserAppConfigurable"
+                displayName="LocalStack S3 Browser"/>
+
+        <!-- Project-level settings -->
+        <projectService
+                serviceImplementation="com.github.localstack.s3browser.settings.S3BrowserProjectSettings"/>
+        <projectConfigurable
+                parentId="com.github.localstack.s3browser.settings.S3BrowserAppConfigurable"
+                instance="com.github.localstack.s3browser.settings.S3BrowserProjectConfigurable"
+                id="com.github.localstack.s3browser.settings.S3BrowserProjectConfigurable"
+                displayName="Project Settings"/>
+
+        <!-- S3 Service -->
+        <applicationService
+                serviceImplementation="com.github.localstack.s3browser.services.S3ClientService"/>
+
+        <!-- Tool Window -->
+        <toolWindow
+                id="LocalStack S3"
+                anchor="right"
+                icon="/icons/s3-bucket.svg"
+                factoryClass="com.github.localstack.s3browser.toolwindow.S3ToolWindowFactory"/>
+
+        <!-- Virtual File System -->
+        <virtualFileSystem
+                key="s3"
+                implementationClass="com.github.localstack.s3browser.vfs.S3VirtualFileSystem"/>
+
+        <!-- Notifications -->
+        <notificationGroup
+                id="LocalStack S3 Browser"
+                displayType="BALLOON"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener
+                class="com.github.localstack.s3browser.vfs.S3FileDocumentManagerListener"
+                topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"/>
+    </applicationListeners>
+
+    <actions>
+        <!-- Toolbar actions for the tool window -->
+        <group id="LocalStackS3.ToolbarActions" text="S3 Actions">
+            <action id="LocalStackS3.Refresh"
+                    class="com.github.localstack.s3browser.actions.RefreshAction"
+                    text="Refresh"
+                    description="Refresh S3 buckets and objects"
+                    icon="AllIcons.Actions.Refresh"/>
+            <action id="LocalStackS3.CreateBucket"
+                    class="com.github.localstack.s3browser.actions.CreateBucketAction"
+                    text="Create Bucket"
+                    description="Create a new S3 bucket"
+                    icon="AllIcons.Actions.NewFolder"/>
+            <action id="LocalStackS3.Settings"
+                    class="com.github.localstack.s3browser.actions.OpenSettingsAction"
+                    text="Settings"
+                    description="Open LocalStack S3 settings"
+                    icon="AllIcons.General.Settings"/>
+        </group>
+
+        <!-- Context menu actions -->
+        <group id="LocalStackS3.ContextMenu" text="S3 Context Menu" popup="true">
+            <action id="LocalStackS3.CreateFolder"
+                    class="com.github.localstack.s3browser.actions.CreateFolderAction"
+                    text="New Folder"
+                    description="Create a new folder"
+                    icon="AllIcons.Actions.NewFolder"/>
+            <action id="LocalStackS3.CreateFile"
+                    class="com.github.localstack.s3browser.actions.CreateFileAction"
+                    text="New File"
+                    description="Create a new file"
+                    icon="AllIcons.FileTypes.Any_type"/>
+            <action id="LocalStackS3.UploadFile"
+                    class="com.github.localstack.s3browser.actions.UploadFileAction"
+                    text="Upload File..."
+                    description="Upload a file from local filesystem"
+                    icon="AllIcons.Actions.Upload"/>
+            <separator/>
+            <action id="LocalStackS3.Rename"
+                    class="com.github.localstack.s3browser.actions.RenameAction"
+                    text="Rename"
+                    description="Rename the selected item"
+                    icon="AllIcons.Actions.Edit"/>
+            <action id="LocalStackS3.Delete"
+                    class="com.github.localstack.s3browser.actions.DeleteAction"
+                    text="Delete"
+                    description="Delete the selected item"
+                    icon="AllIcons.Actions.GC"/>
+            <separator/>
+            <action id="LocalStackS3.CopyPath"
+                    class="com.github.localstack.s3browser.actions.CopyPathAction"
+                    text="Copy S3 Path"
+                    description="Copy the S3 path to clipboard"
+                    icon="AllIcons.Actions.Copy"/>
+            <separator/>
+            <action id="LocalStackS3.DeleteBucket"
+                    class="com.github.localstack.s3browser.actions.DeleteBucketAction"
+                    text="Delete Bucket"
+                    description="Delete the selected bucket"
+                    icon="AllIcons.Actions.GC"/>
+        </group>
+    </actions>
+</idea-plugin>
