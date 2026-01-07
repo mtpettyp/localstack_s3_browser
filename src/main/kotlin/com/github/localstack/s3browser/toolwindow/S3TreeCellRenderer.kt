@@ -45,7 +45,7 @@ class S3TreeCellRenderer : ColoredTreeCellRenderer() {
             }
 
             is S3TreeNode.Folder -> {
-                icon = if (expanded) AllIcons.Nodes.FolderOpen else AllIcons.Nodes.Folder
+                icon = AllIcons.Nodes.Folder
                 append(node.name)
             }
 

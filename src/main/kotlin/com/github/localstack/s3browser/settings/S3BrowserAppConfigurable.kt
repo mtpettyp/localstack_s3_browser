@@ -20,6 +20,7 @@ class S3BrowserAppConfigurable : Configurable {
     private var regionField: JBTextField? = null
     private var timeoutSpinner: JSpinner? = null
     private var autoRefreshCheckbox: JBCheckBox? = null
+    private var autoRefreshCell: Cell<JBCheckBox>? = null
     private var autoRefreshIntervalSpinner: JSpinner? = null
     private var confirmDeletionsCheckbox: JBCheckBox? = null
     private var showHiddenFilesCheckbox: JBCheckBox? = null
@@ -56,14 +57,14 @@ class S3BrowserAppConfigurable : Configurable {
 
             group("Refresh Settings") {
                 row {
-                    autoRefreshCheckbox = checkBox("Enable auto-refresh")
+                    autoRefreshCell = checkBox("Enable auto-refresh")
                         .comment("Automatically refresh the bucket list periodically")
-                        .component
+                    autoRefreshCheckbox = autoRefreshCell!!.component
                     autoRefreshCheckbox?.isSelected = settings.autoRefreshEnabled
                 }
                 row("Refresh interval:") {
                     autoRefreshIntervalSpinner = spinner(5..300, 5)
-                        .enabledIf(autoRefreshCheckbox!!.selected)
+                        .enabledIf(autoRefreshCell!!.selected)
                         .component
                     autoRefreshIntervalSpinner?.value = settings.autoRefreshIntervalSeconds
                     cell(JBLabel("seconds"))
@@ -126,6 +127,7 @@ class S3BrowserAppConfigurable : Configurable {
         regionField = null
         timeoutSpinner = null
         autoRefreshCheckbox = null
+        autoRefreshCell = null
         autoRefreshIntervalSpinner = null
         confirmDeletionsCheckbox = null
         showHiddenFilesCheckbox = null

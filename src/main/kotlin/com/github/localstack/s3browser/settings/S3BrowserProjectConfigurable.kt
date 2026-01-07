@@ -15,6 +15,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
 
     private var panel: JPanel? = null
     private var useProjectSettingsCheckbox: JBCheckBox? = null
+    private var useProjectSettingsCell: Cell<JBCheckBox>? = null
     private var endpointField: JBTextField? = null
     private var regionField: JBTextField? = null
     private var defaultBucketField: JBTextField? = null
@@ -27,9 +28,9 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
 
         panel = panel {
             row {
-                useProjectSettingsCheckbox = checkBox("Use project-specific settings")
+                useProjectSettingsCell = checkBox("Use project-specific settings")
                     .comment("Override application-level settings for this project")
-                    .component
+                useProjectSettingsCheckbox = useProjectSettingsCell!!.component
                 useProjectSettingsCheckbox?.isSelected = settings.useProjectSettings
             }
 
@@ -38,7 +39,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
                     endpointField = textField()
                         .columns(COLUMNS_LARGE)
                         .comment("Leave empty to use application default: ${appSettings.defaultEndpoint}")
-                        .enabledIf(useProjectSettingsCheckbox!!.selected)
+                        .enabledIf(useProjectSettingsCell!!.selected)
                         .component
                     endpointField?.text = settings.endpoint
                 }
@@ -46,7 +47,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
                     regionField = textField()
                         .columns(COLUMNS_MEDIUM)
                         .comment("Leave empty to use application default: ${appSettings.defaultRegion}")
-                        .enabledIf(useProjectSettingsCheckbox!!.selected)
+                        .enabledIf(useProjectSettingsCell!!.selected)
                         .component
                     regionField?.text = settings.region
                 }
@@ -97,6 +98,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
     override fun disposeUIResources() {
         panel = null
         useProjectSettingsCheckbox = null
+        useProjectSettingsCell = null
         endpointField = null
         regionField = null
         defaultBucketField = null

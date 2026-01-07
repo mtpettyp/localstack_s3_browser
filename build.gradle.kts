@@ -38,7 +38,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(25)
+    jvmToolchain(17)
 }
 
 java {
@@ -87,7 +87,7 @@ intellijPlatform {
 
 tasks {
     wrapper {
-        gradleVersion = "8.5"
+        gradleVersion = "8.12"
     }
 
     test {

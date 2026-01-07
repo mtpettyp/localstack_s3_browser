@@ -9,6 +9,7 @@ build/
 *.ipr
 *.iws
 out/
+.intellijPlatform/
 
 # OS generated files
 .DS_Store
@@ -22,3 +23,7 @@ Thumbs.db
 # Plugin build artifacts
 /build/
 /distributions/
+
+# Claude
+.claude/
+
