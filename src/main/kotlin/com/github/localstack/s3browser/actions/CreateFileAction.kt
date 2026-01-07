@@ -5,6 +5,7 @@ import com.github.localstack.s3browser.services.S3ClientService
 import com.github.localstack.s3browser.services.S3OperationException
 import com.github.localstack.s3browser.toolwindow.S3BrowserPanel
 import com.github.localstack.s3browser.vfs.S3VirtualFileSystem
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -72,6 +73,8 @@ class CreateFileAction : AnAction() {
         val node = e.getData(S3BrowserPanel.S3_TREE_NODE)
         e.presentation.isEnabledAndVisible = node is S3TreeNode.Bucket || node is S3TreeNode.Folder
     }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }
 
 /**

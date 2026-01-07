@@ -5,6 +5,7 @@ import com.github.localstack.s3browser.services.S3ClientService
 import com.github.localstack.s3browser.services.S3OperationException
 import com.github.localstack.s3browser.settings.S3BrowserAppSettings
 import com.github.localstack.s3browser.toolwindow.S3BrowserPanel
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -64,4 +65,6 @@ class DeleteBucketAction : AnAction() {
         val node = e.getData(S3BrowserPanel.S3_TREE_NODE)
         e.presentation.isEnabledAndVisible = node is S3TreeNode.Bucket
     }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }

@@ -8,7 +8,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
@@ -56,10 +57,14 @@ class S3ClientService : Disposable {
 
         val appSettings = S3BrowserAppSettings.getInstance()
 
+        // Create credentials provider
+        val credentials = AwsBasicCredentials.create(appSettings.accessKeyId, appSettings.secretAccessKey)
+        val credentialsProvider = StaticCredentialsProvider.create(credentials)
+
         cachedClient = S3Client.builder()
             .endpointOverride(URI.create(endpoint))
             .region(Region.of(region))
-            .credentialsProvider(AnonymousCredentialsProvider.create())
+            .credentialsProvider(credentialsProvider)
             .forcePathStyle(true) // Required for LocalStack
             .overrideConfiguration { config ->
                 config.apiCallTimeout(Duration.ofMillis(appSettings.connectionTimeoutMs.toLong()))

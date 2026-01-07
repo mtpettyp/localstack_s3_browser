@@ -2,6 +2,7 @@ package com.github.localstack.s3browser.actions
 
 import com.github.localstack.s3browser.model.S3TreeNode
 import com.github.localstack.s3browser.toolwindow.S3BrowserPanel
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.ide.CopyPasteManager
@@ -31,4 +32,6 @@ class CopyPathAction : AnAction() {
                 node is S3TreeNode.Folder ||
                 node is S3TreeNode.S3Object
     }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }

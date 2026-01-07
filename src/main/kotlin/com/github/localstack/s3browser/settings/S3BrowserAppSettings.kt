@@ -23,6 +23,8 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
     data class State(
         var defaultEndpoint: String = DEFAULT_ENDPOINT,
         var defaultRegion: String = DEFAULT_REGION,
+        var accessKeyId: String = DEFAULT_ACCESS_KEY,
+        var secretAccessKey: String = DEFAULT_SECRET_KEY,
         var connectionTimeoutMs: Int = DEFAULT_TIMEOUT_MS,
         var autoRefreshEnabled: Boolean = false,
         var autoRefreshIntervalSeconds: Int = 30,
@@ -43,6 +45,14 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
     var defaultRegion: String
         get() = myState.defaultRegion
         set(value) { myState.defaultRegion = value }
+
+    var accessKeyId: String
+        get() = myState.accessKeyId
+        set(value) { myState.accessKeyId = value }
+
+    var secretAccessKey: String
+        get() = myState.secretAccessKey
+        set(value) { myState.secretAccessKey = value }
 
     var connectionTimeoutMs: Int
         get() = myState.connectionTimeoutMs
@@ -67,6 +77,8 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
     companion object {
         const val DEFAULT_ENDPOINT = "http://localhost:4566"
         const val DEFAULT_REGION = "us-east-1"
+        const val DEFAULT_ACCESS_KEY = "test"
+        const val DEFAULT_SECRET_KEY = "test"
         const val DEFAULT_TIMEOUT_MS = 5000
 
         @JvmStatic

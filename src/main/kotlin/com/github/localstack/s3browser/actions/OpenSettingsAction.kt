@@ -1,5 +1,6 @@
 package com.github.localstack.s3browser.actions
 
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -17,4 +18,6 @@ class OpenSettingsAction : AnAction() {
             "com.github.localstack.s3browser.settings.S3BrowserAppConfigurable"
         )
     }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }

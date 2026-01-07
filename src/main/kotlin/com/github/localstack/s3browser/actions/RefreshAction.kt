@@ -1,6 +1,7 @@
 package com.github.localstack.s3browser.actions
 
 import com.github.localstack.s3browser.toolwindow.S3BrowserPanel
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 
@@ -17,4 +18,6 @@ class RefreshAction : AnAction() {
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabled = e.getData(S3BrowserPanel.S3_BROWSER_PANEL) != null
     }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }
