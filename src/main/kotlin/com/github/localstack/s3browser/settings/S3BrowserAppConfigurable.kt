@@ -8,7 +8,6 @@ import com.intellij.ui.dsl.builder.*
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JSpinner
-import javax.swing.SpinnerNumberModel
 
 /**
  * Application-level settings configurable for LocalStack S3 Browser.
@@ -19,7 +18,7 @@ class S3BrowserAppConfigurable : Configurable {
     private var endpointField: JBTextField? = null
     private var regionField: JBTextField? = null
     private var timeoutSpinner: JSpinner? = null
-    private var autoRefreshCheckbox: JBCheckBox? = null
+    private var autoRefreshCheckbox: Cell<JBCheckBox>? = null
     private var autoRefreshIntervalSpinner: JSpinner? = null
     private var confirmDeletionsCheckbox: JBCheckBox? = null
     private var showHiddenFilesCheckbox: JBCheckBox? = null
@@ -58,8 +57,7 @@ class S3BrowserAppConfigurable : Configurable {
                 row {
                     autoRefreshCheckbox = checkBox("Enable auto-refresh")
                         .comment("Automatically refresh the bucket list periodically")
-                        .component
-                    autoRefreshCheckbox?.isSelected = settings.autoRefreshEnabled
+                    autoRefreshCheckbox?.component?.isSelected = settings.autoRefreshEnabled
                 }
                 row("Refresh interval:") {
                     autoRefreshIntervalSpinner = spinner(5..300, 5)
@@ -92,7 +90,7 @@ class S3BrowserAppConfigurable : Configurable {
         return endpointField?.text != settings.defaultEndpoint ||
                 regionField?.text != settings.defaultRegion ||
                 timeoutSpinner?.value != settings.connectionTimeoutMs ||
-                autoRefreshCheckbox?.isSelected != settings.autoRefreshEnabled ||
+                autoRefreshCheckbox?.component?.isSelected != settings.autoRefreshEnabled ||
                 autoRefreshIntervalSpinner?.value != settings.autoRefreshIntervalSeconds ||
                 confirmDeletionsCheckbox?.isSelected != settings.confirmDeletions ||
                 showHiddenFilesCheckbox?.isSelected != settings.showHiddenFiles
@@ -103,7 +101,7 @@ class S3BrowserAppConfigurable : Configurable {
         settings.defaultEndpoint = endpointField?.text ?: S3BrowserAppSettings.DEFAULT_ENDPOINT
         settings.defaultRegion = regionField?.text ?: S3BrowserAppSettings.DEFAULT_REGION
         settings.connectionTimeoutMs = timeoutSpinner?.value as? Int ?: S3BrowserAppSettings.DEFAULT_TIMEOUT_MS
-        settings.autoRefreshEnabled = autoRefreshCheckbox?.isSelected ?: false
+        settings.autoRefreshEnabled = autoRefreshCheckbox?.component?.isSelected ?: false
         settings.autoRefreshIntervalSeconds = autoRefreshIntervalSpinner?.value as? Int ?: 30
         settings.confirmDeletions = confirmDeletionsCheckbox?.isSelected ?: true
         settings.showHiddenFiles = showHiddenFilesCheckbox?.isSelected ?: false
@@ -114,7 +112,7 @@ class S3BrowserAppConfigurable : Configurable {
         endpointField?.text = settings.defaultEndpoint
         regionField?.text = settings.defaultRegion
         timeoutSpinner?.value = settings.connectionTimeoutMs
-        autoRefreshCheckbox?.isSelected = settings.autoRefreshEnabled
+        autoRefreshCheckbox?.component?.isSelected = settings.autoRefreshEnabled
         autoRefreshIntervalSpinner?.value = settings.autoRefreshIntervalSeconds
         confirmDeletionsCheckbox?.isSelected = settings.confirmDeletions
         showHiddenFilesCheckbox?.isSelected = settings.showHiddenFiles

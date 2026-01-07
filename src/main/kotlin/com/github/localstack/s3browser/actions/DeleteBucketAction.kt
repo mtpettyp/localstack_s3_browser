@@ -25,13 +25,12 @@ class DeleteBucketAction : AnAction() {
         val settings = S3BrowserAppSettings.getInstance()
 
         if (settings.confirmDeletions) {
-            val result = Messages.showYesNoCancelDialog(
+            val result = Messages.showYesNoDialog(
                 project,
                 "Delete bucket '${node.name}'?\n\nThis will also delete all objects in the bucket.",
                 "Delete Bucket",
                 "Delete",
                 "Cancel",
-                null,
                 Messages.getWarningIcon()
             )
 

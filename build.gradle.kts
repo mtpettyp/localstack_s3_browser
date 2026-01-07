@@ -20,7 +20,6 @@ dependencies {
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         zipSigner()
-        instrumentationTools()
     }
 
     // AWS SDK v2 for S3
@@ -37,8 +36,15 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.9")
 }
 
-kotlin {
-    jvmToolchain(17)
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 intellijPlatform {
@@ -76,7 +82,7 @@ intellijPlatform {
 
 tasks {
     wrapper {
-        gradleVersion = "8.5"
+        gradleVersion = "8.14.3"
     }
 
     test {

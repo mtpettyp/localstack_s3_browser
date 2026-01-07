@@ -22,3 +22,6 @@ Thumbs.db
 # Plugin build artifacts
 /build/
 /distributions/
+
+# IntelliJ Platform Gradle Plugin cache
+.intellijPlatform/

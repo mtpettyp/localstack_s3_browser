@@ -14,7 +14,7 @@ import javax.swing.JPanel
 class S3BrowserProjectConfigurable(private val project: Project) : Configurable {
 
     private var panel: JPanel? = null
-    private var useProjectSettingsCheckbox: JBCheckBox? = null
+    private var useProjectSettingsCheckbox: Cell<JBCheckBox>? = null
     private var endpointField: JBTextField? = null
     private var regionField: JBTextField? = null
     private var defaultBucketField: JBTextField? = null
@@ -29,8 +29,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
             row {
                 useProjectSettingsCheckbox = checkBox("Use project-specific settings")
                     .comment("Override application-level settings for this project")
-                    .component
-                useProjectSettingsCheckbox?.isSelected = settings.useProjectSettings
+                useProjectSettingsCheckbox?.component?.isSelected = settings.useProjectSettings
             }
 
             group("Project Connection Settings") {
@@ -72,7 +71,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
 
     override fun isModified(): Boolean {
         val settings = S3BrowserProjectSettings.getInstance(project)
-        return useProjectSettingsCheckbox?.isSelected != settings.useProjectSettings ||
+        return useProjectSettingsCheckbox?.component?.isSelected != settings.useProjectSettings ||
                 endpointField?.text != settings.endpoint ||
                 regionField?.text != settings.region ||
                 defaultBucketField?.text != settings.defaultBucket
@@ -80,7 +79,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
 
     override fun apply() {
         val settings = S3BrowserProjectSettings.getInstance(project)
-        settings.useProjectSettings = useProjectSettingsCheckbox?.isSelected ?: false
+        settings.useProjectSettings = useProjectSettingsCheckbox?.component?.isSelected ?: false
         settings.endpoint = endpointField?.text ?: ""
         settings.region = regionField?.text ?: ""
         settings.defaultBucket = defaultBucketField?.text ?: ""
@@ -88,7 +87,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
 
     override fun reset() {
         val settings = S3BrowserProjectSettings.getInstance(project)
-        useProjectSettingsCheckbox?.isSelected = settings.useProjectSettings
+        useProjectSettingsCheckbox?.component?.isSelected = settings.useProjectSettings
         endpointField?.text = settings.endpoint
         regionField?.text = settings.region
         defaultBucketField?.text = settings.defaultBucket
