@@ -20,7 +20,6 @@ dependencies {
         bundledPlugin("com.intellij.java")
         pluginVerifier()
         zipSigner()
-        instrumentationTools()
     }
 
     // AWS SDK v2 for S3
