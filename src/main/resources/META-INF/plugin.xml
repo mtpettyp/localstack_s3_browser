@@ -116,11 +116,15 @@
                     description="Delete the selected item"
                     icon="AllIcons.Actions.GC"/>
             <separator/>
+            <action id="LocalStackS3.Copy"
+                    class="com.github.localstack.s3browser.actions.CopyAction"
+                    text="Copy"
+                    description="Copy file or folder to clipboard"
+                    icon="AllIcons.Actions.Copy"/>
             <action id="LocalStackS3.CopyPath"
                     class="com.github.localstack.s3browser.actions.CopyPathAction"
                     text="Copy S3 Path"
-                    description="Copy the S3 path to clipboard"
-                    icon="AllIcons.Actions.Copy"/>
+                    description="Copy the S3 path to clipboard"/>
             <action id="LocalStackS3.Download"
                     class="com.github.localstack.s3browser.actions.DownloadAction"
                     text="Download..."
