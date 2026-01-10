@@ -270,8 +270,64 @@ class S3BrowserPanel(
     }
 
     fun refresh() {
+        // Save expanded paths before refresh
+        val expandedPaths = getExpandedNodePaths()
+
         treeModel.refresh()
         tree.updateUI()
+
+        // Restore expanded paths after a short delay to allow tree to rebuild
+        if (expandedPaths.isNotEmpty()) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                // Wait a bit for the tree to load initial data
+                Thread.sleep(100)
+                SwingUtilities.invokeLater {
+                    restoreExpandedPaths(expandedPaths)
+                }
+            }
+        }
+    }
+
+    private fun getExpandedNodePaths(): Set<String> {
+        val expandedPaths = mutableSetOf<String>()
+        val rowCount = tree.rowCount
+        for (row in 0 until rowCount) {
+            val treePath = tree.getPathForRow(row)
+            if (tree.isExpanded(treePath)) {
+                val node = treePath.lastPathComponent as? S3TreeNode
+                if (node != null) {
+                    expandedPaths.add(node.path)
+                }
+            }
+        }
+        return expandedPaths
+    }
+
+    private fun restoreExpandedPaths(expandedPaths: Set<String>) {
+        expandPathsRecursively(expandedPaths, tree.getPathForRow(0) ?: return)
+    }
+
+    private fun expandPathsRecursively(expandedPaths: Set<String>, treePath: TreePath) {
+        val node = treePath.lastPathComponent as? S3TreeNode ?: return
+
+        if (node.path in expandedPaths) {
+            tree.expandPath(treePath)
+
+            // After expanding, schedule checking children
+            ApplicationManager.getApplication().executeOnPooledThread {
+                Thread.sleep(50)
+                SwingUtilities.invokeLater {
+                    val childCount = treeModel.getChildCount(node)
+                    for (i in 0 until childCount) {
+                        val child = treeModel.getChild(node, i)
+                        if (child is S3TreeNode && child !is S3TreeNode.Loading && child !is S3TreeNode.Error) {
+                            val childPath = treePath.pathByAddingChild(child)
+                            expandPathsRecursively(expandedPaths, childPath)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun getSelectedNode(): S3TreeNode? {
