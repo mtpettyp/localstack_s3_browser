@@ -258,7 +258,7 @@ class S3BrowserAppConfigurable : Configurable {
         }
 
         override fun createCenterPanel(): JComponent {
-            return panel {
+            val result = panel {
                 row("Name:") {
                     nameField = textField()
                         .columns(COLUMNS_LARGE)
@@ -295,6 +295,17 @@ class S3BrowserAppConfigurable : Configurable {
                     secretKeyField?.text = existingInstance?.secretAccessKey ?: S3BrowserAppSettings.DEFAULT_SECRET_KEY
                 }
             }
+
+            // Add document listeners to trigger revalidation on text changes
+            val revalidateListener = object : javax.swing.event.DocumentListener {
+                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = initValidation()
+                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = initValidation()
+                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = initValidation()
+            }
+            nameField?.document?.addDocumentListener(revalidateListener)
+            endpointField?.document?.addDocumentListener(revalidateListener)
+
+            return result
         }
 
         fun getInstance(): LocalStackInstance {
