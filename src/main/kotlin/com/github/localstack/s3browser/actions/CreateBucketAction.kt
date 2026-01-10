@@ -66,8 +66,8 @@ class CreateBucketAction : AnAction() {
 
     override fun update(e: AnActionEvent) {
         val node = e.getData(S3BrowserPanel.S3_TREE_NODE)
-        // Only enable for InstanceRoot or Bucket nodes
-        e.presentation.isEnabledAndVisible = node is S3TreeNode.InstanceRoot || node is S3TreeNode.Bucket
+        // Only enable for InstanceRoot nodes
+        e.presentation.isEnabledAndVisible = node is S3TreeNode.InstanceRoot
     }
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT

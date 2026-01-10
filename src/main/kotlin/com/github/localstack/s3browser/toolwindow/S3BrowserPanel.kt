@@ -19,10 +19,12 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
 import java.awt.dnd.*
 import java.io.File
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
+import javax.swing.TransferHandler
 import javax.swing.tree.TreePath
 import javax.swing.tree.TreeSelectionModel
 
@@ -114,6 +116,11 @@ class S3BrowserPanel(
                         action.actionPerformed(event)
                     } else if (e.keyCode == java.awt.event.KeyEvent.VK_F5) {
                         refresh()
+                    } else if (e.keyCode == java.awt.event.KeyEvent.VK_C &&
+                               (e.modifiersEx and java.awt.event.InputEvent.META_DOWN_MASK != 0 ||
+                                e.modifiersEx and java.awt.event.InputEvent.CTRL_DOWN_MASK != 0)) {
+                        // CMD+C (Mac) or CTRL+C (Windows/Linux) to copy files
+                        copySelectedToClipboard()
                     }
                 }
             })
@@ -137,6 +144,18 @@ class S3BrowserPanel(
     }
 
     private fun setupDragAndDrop() {
+        // Setup drag source for dragging S3 files out of the tree
+        tree.transferHandler = object : TransferHandler() {
+            override fun getSourceActions(c: javax.swing.JComponent): Int = COPY
+
+            override fun createTransferable(c: javax.swing.JComponent): Transferable? {
+                val selectedNode = getSelectedNode() ?: return null
+                return S3FileTransferable(selectedNode, this@S3BrowserPanel)
+            }
+        }
+        tree.dragEnabled = true
+
+        // Setup drop target for dropping files into the tree
         DropTarget(tree, DnDConstants.ACTION_COPY, object : DropTargetListener {
             override fun dragEnter(dtde: DropTargetDragEvent) {
                 if (isFileDrag(dtde)) {
@@ -278,6 +297,27 @@ class S3BrowserPanel(
                 }
             } catch (e: Exception) {
                 log.warn("Failed to open file: ${node.path}", e)
+            }
+        }
+    }
+
+    private fun copySelectedToClipboard() {
+        val node = getSelectedNode() ?: return
+
+        // Only allow copying for files, folders, and buckets
+        if (node !is S3TreeNode.S3Object && node !is S3TreeNode.Folder && node !is S3TreeNode.Bucket) {
+            return
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val transferable = S3FileTransferable(node, this)
+                SwingUtilities.invokeLater {
+                    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(transferable, null)
+                    log.info("Copied ${node.name} to clipboard")
+                }
+            } catch (e: Exception) {
+                log.warn("Failed to copy to clipboard: ${node.path}", e)
             }
         }
     }

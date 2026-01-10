@@ -121,6 +121,11 @@
                     text="Copy S3 Path"
                     description="Copy the S3 path to clipboard"
                     icon="AllIcons.Actions.Copy"/>
+            <action id="LocalStackS3.Download"
+                    class="com.github.localstack.s3browser.actions.DownloadAction"
+                    text="Download..."
+                    description="Download S3 object to local filesystem"
+                    icon="AllIcons.Actions.Download"/>
             <separator/>
             <action id="LocalStackS3.DeleteBucket"
                     class="com.github.localstack.s3browser.actions.DeleteBucketAction"
