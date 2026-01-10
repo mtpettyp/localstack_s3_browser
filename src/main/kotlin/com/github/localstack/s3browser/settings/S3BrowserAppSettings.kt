@@ -26,7 +26,6 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
         var instances: MutableList<LocalStackInstance> = mutableListOf(),
         var connectionTimeoutMs: Int = DEFAULT_TIMEOUT_MS,
         var confirmDeletions: Boolean = true,
-        var showHiddenFiles: Boolean = false,
         // Legacy fields for migration
         var defaultEndpoint: String = "",
         var defaultRegion: String = "",
@@ -91,10 +90,6 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
     var confirmDeletions: Boolean
         get() = myState.confirmDeletions
         set(value) { myState.confirmDeletions = value }
-
-    var showHiddenFiles: Boolean
-        get() = myState.showHiddenFiles
-        set(value) { myState.showHiddenFiles = value }
 
     companion object {
         const val DEFAULT_ENDPOINT = "http://localhost:4566"

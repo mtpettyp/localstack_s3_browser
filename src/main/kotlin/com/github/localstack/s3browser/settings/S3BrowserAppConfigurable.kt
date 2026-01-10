@@ -26,7 +26,6 @@ class S3BrowserAppConfigurable : Configurable {
     private var instancesPanel: InstancesPanel? = null
     private var timeoutSpinner: JSpinner? = null
     private var confirmDeletionsCheckbox: JBCheckBox? = null
-    private var showHiddenFilesCheckbox: JBCheckBox? = null
 
     override fun getDisplayName(): String = "LocalStack S3 Browser"
 
@@ -63,11 +62,6 @@ class S3BrowserAppConfigurable : Configurable {
                         .component
                     confirmDeletionsCheckbox?.isSelected = settings.confirmDeletions
                 }
-                row {
-                    showHiddenFilesCheckbox = checkBox("Show hidden files (starting with .)")
-                        .component
-                    showHiddenFilesCheckbox?.isSelected = settings.showHiddenFiles
-                }
             }
         }
 
@@ -79,8 +73,7 @@ class S3BrowserAppConfigurable : Configurable {
         val settings = S3BrowserAppSettings.getInstance()
         return instancesPanel?.isModified(settings.instances) == true ||
                 timeoutSpinner?.value != settings.connectionTimeoutMs ||
-                confirmDeletionsCheckbox?.isSelected != settings.confirmDeletions ||
-                showHiddenFilesCheckbox?.isSelected != settings.showHiddenFiles
+                confirmDeletionsCheckbox?.isSelected != settings.confirmDeletions
     }
 
     override fun apply() {
@@ -92,7 +85,6 @@ class S3BrowserAppConfigurable : Configurable {
 
         settings.connectionTimeoutMs = timeoutSpinner?.value as? Int ?: S3BrowserAppSettings.DEFAULT_TIMEOUT_MS
         settings.confirmDeletions = confirmDeletionsCheckbox?.isSelected ?: true
-        settings.showHiddenFiles = showHiddenFilesCheckbox?.isSelected ?: false
 
         // Invalidate cached clients when settings change
         S3ClientService.getInstance().invalidateAllClients()
@@ -108,7 +100,6 @@ class S3BrowserAppConfigurable : Configurable {
         instancesPanel?.resetData(settings.instances.toMutableList())
         timeoutSpinner?.value = settings.connectionTimeoutMs
         confirmDeletionsCheckbox?.isSelected = settings.confirmDeletions
-        showHiddenFilesCheckbox?.isSelected = settings.showHiddenFiles
     }
 
     override fun disposeUIResources() {
@@ -116,7 +107,6 @@ class S3BrowserAppConfigurable : Configurable {
         instancesPanel = null
         timeoutSpinner = null
         confirmDeletionsCheckbox = null
-        showHiddenFilesCheckbox = null
     }
 
     /**
