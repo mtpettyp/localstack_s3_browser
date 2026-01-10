@@ -25,9 +25,6 @@ class S3BrowserAppConfigurable : Configurable {
     private var panel: JPanel? = null
     private var instancesPanel: InstancesPanel? = null
     private var timeoutSpinner: JSpinner? = null
-    private var autoRefreshCheckbox: JBCheckBox? = null
-    private var autoRefreshCell: Cell<JBCheckBox>? = null
-    private var autoRefreshIntervalSpinner: JSpinner? = null
     private var confirmDeletionsCheckbox: JBCheckBox? = null
     private var showHiddenFilesCheckbox: JBCheckBox? = null
 
@@ -60,22 +57,6 @@ class S3BrowserAppConfigurable : Configurable {
                 }
             }
 
-            group("Refresh Settings") {
-                row {
-                    autoRefreshCell = checkBox("Enable auto-refresh")
-                        .comment("Automatically refresh the bucket list periodically")
-                    autoRefreshCheckbox = autoRefreshCell!!.component
-                    autoRefreshCheckbox?.isSelected = settings.autoRefreshEnabled
-                }
-                row("Refresh interval:") {
-                    autoRefreshIntervalSpinner = spinner(5..300, 5)
-                        .enabledIf(autoRefreshCell!!.selected)
-                        .component
-                    autoRefreshIntervalSpinner?.value = settings.autoRefreshIntervalSeconds
-                    cell(JBLabel("seconds"))
-                }
-            }
-
             group("Behavior") {
                 row {
                     confirmDeletionsCheckbox = checkBox("Confirm before deleting files and buckets")
@@ -98,8 +79,6 @@ class S3BrowserAppConfigurable : Configurable {
         val settings = S3BrowserAppSettings.getInstance()
         return instancesPanel?.isModified(settings.instances) == true ||
                 timeoutSpinner?.value != settings.connectionTimeoutMs ||
-                autoRefreshCheckbox?.isSelected != settings.autoRefreshEnabled ||
-                autoRefreshIntervalSpinner?.value != settings.autoRefreshIntervalSeconds ||
                 confirmDeletionsCheckbox?.isSelected != settings.confirmDeletions ||
                 showHiddenFilesCheckbox?.isSelected != settings.showHiddenFiles
     }
@@ -112,8 +91,6 @@ class S3BrowserAppConfigurable : Configurable {
         instancesPanel?.getData()?.let { settings.state.instances.addAll(it) }
 
         settings.connectionTimeoutMs = timeoutSpinner?.value as? Int ?: S3BrowserAppSettings.DEFAULT_TIMEOUT_MS
-        settings.autoRefreshEnabled = autoRefreshCheckbox?.isSelected ?: false
-        settings.autoRefreshIntervalSeconds = autoRefreshIntervalSpinner?.value as? Int ?: 30
         settings.confirmDeletions = confirmDeletionsCheckbox?.isSelected ?: true
         settings.showHiddenFiles = showHiddenFilesCheckbox?.isSelected ?: false
 
@@ -130,8 +107,6 @@ class S3BrowserAppConfigurable : Configurable {
         val settings = S3BrowserAppSettings.getInstance()
         instancesPanel?.resetData(settings.instances.toMutableList())
         timeoutSpinner?.value = settings.connectionTimeoutMs
-        autoRefreshCheckbox?.isSelected = settings.autoRefreshEnabled
-        autoRefreshIntervalSpinner?.value = settings.autoRefreshIntervalSeconds
         confirmDeletionsCheckbox?.isSelected = settings.confirmDeletions
         showHiddenFilesCheckbox?.isSelected = settings.showHiddenFiles
     }
@@ -140,9 +115,6 @@ class S3BrowserAppConfigurable : Configurable {
         panel = null
         instancesPanel = null
         timeoutSpinner = null
-        autoRefreshCheckbox = null
-        autoRefreshCell = null
-        autoRefreshIntervalSpinner = null
         confirmDeletionsCheckbox = null
         showHiddenFilesCheckbox = null
     }

@@ -25,8 +25,6 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
         @XCollection(style = XCollection.Style.v2)
         var instances: MutableList<LocalStackInstance> = mutableListOf(),
         var connectionTimeoutMs: Int = DEFAULT_TIMEOUT_MS,
-        var autoRefreshEnabled: Boolean = false,
-        var autoRefreshIntervalSeconds: Int = 30,
         var confirmDeletions: Boolean = true,
         var showHiddenFiles: Boolean = false,
         // Legacy fields for migration
@@ -89,14 +87,6 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
     var connectionTimeoutMs: Int
         get() = myState.connectionTimeoutMs
         set(value) { myState.connectionTimeoutMs = value }
-
-    var autoRefreshEnabled: Boolean
-        get() = myState.autoRefreshEnabled
-        set(value) { myState.autoRefreshEnabled = value }
-
-    var autoRefreshIntervalSeconds: Int
-        get() = myState.autoRefreshIntervalSeconds
-        set(value) { myState.autoRefreshIntervalSeconds = value }
 
     var confirmDeletions: Boolean
         get() = myState.confirmDeletions
