@@ -3,6 +3,10 @@ package com.github.localstack.s3browser.vfs
 import com.github.localstack.s3browser.services.S3ClientService
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.PlainTextFileType
+import com.intellij.openapi.fileTypes.UnknownFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.*
 import java.io.*
@@ -118,6 +122,16 @@ class S3VirtualFile(
     override fun getName(): String = key.substringAfterLast('/')
 
     override fun getFileSystem(): VirtualFileSystem = fileSystem
+
+    override fun getFileType(): FileType {
+        val detectedType = FileTypeManager.getInstance().getFileTypeByFileName(name)
+        // If the file type is unknown, treat it as plain text so it can be opened in the editor
+        return if (detectedType is UnknownFileType) {
+            PlainTextFileType.INSTANCE
+        } else {
+            detectedType
+        }
+    }
 
     override fun getPath(): String = "$bucketName/$key"
 
