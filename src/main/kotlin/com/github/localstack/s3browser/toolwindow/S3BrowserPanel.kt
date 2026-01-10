@@ -31,7 +31,7 @@ import javax.swing.tree.TreeSelectionModel
 class S3BrowserPanel(
     private val project: Project,
     private val toolWindow: ToolWindow
-) : JPanel(BorderLayout()), Disposable {
+) : JPanel(BorderLayout()), Disposable, DataProvider {
 
     private val log = Logger.getInstance(S3BrowserPanel::class.java)
 
@@ -284,13 +284,17 @@ class S3BrowserPanel(
 
     fun createDataContext(): DataContext {
         return DataContext { dataId ->
-            when {
-                CommonDataKeys.PROJECT.`is`(dataId) -> project
-                PlatformDataKeys.TOOL_WINDOW.`is`(dataId) -> toolWindow
-                S3_TREE_NODE.`is`(dataId) -> getSelectedNode()
-                S3_BROWSER_PANEL.`is`(dataId) -> this
-                else -> null
-            }
+            getData(dataId)
+        }
+    }
+
+    override fun getData(dataId: String): Any? {
+        return when {
+            CommonDataKeys.PROJECT.`is`(dataId) -> project
+            PlatformDataKeys.TOOL_WINDOW.`is`(dataId) -> toolWindow
+            S3_TREE_NODE.`is`(dataId) -> getSelectedNode()
+            S3_BROWSER_PANEL.`is`(dataId) -> this
+            else -> null
         }
     }
 
