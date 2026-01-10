@@ -2,7 +2,7 @@ package com.github.localstack.s3browser.toolwindow
 
 import com.github.localstack.s3browser.model.S3TreeNode
 import com.github.localstack.s3browser.services.S3ClientService
-import com.github.localstack.s3browser.settings.S3BrowserProjectSettings
+import com.github.localstack.s3browser.settings.S3BrowserAppSettings
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -16,6 +16,7 @@ import javax.swing.tree.TreePath
 
 /**
  * Tree model for the S3 browser that supports lazy loading of children.
+ * Supports multiple LocalStack instances as root nodes.
  */
 class S3TreeModel(
     private val project: Project
@@ -26,11 +27,9 @@ class S3TreeModel(
     private val childrenCache = ConcurrentHashMap<String, List<S3TreeNode>>()
     private val loadingNodes = ConcurrentHashMap.newKeySet<String>()
 
-    private var rootNode: S3TreeNode.Root = S3TreeNode.Root(
-        S3BrowserProjectSettings.getInstance(project).getEffectiveEndpoint()
-    )
+    private val virtualRoot = S3TreeNode.VirtualRoot
 
-    override fun getRoot(): Any = rootNode
+    override fun getRoot(): Any = virtualRoot
 
     override fun getChild(parent: Any?, index: Int): Any {
         val node = parent as? S3TreeNode ?: return S3TreeNode.Error("Invalid parent")
@@ -73,6 +72,11 @@ class S3TreeModel(
      * Gets children for a node, loading them if necessary.
      */
     fun getChildren(node: S3TreeNode): List<S3TreeNode> {
+        // Special handling for virtual root - return instances synchronously
+        if (node is S3TreeNode.VirtualRoot) {
+            return getInstanceRoots()
+        }
+
         val cacheKey = node.path
 
         // Return cached children if available
@@ -89,6 +93,20 @@ class S3TreeModel(
 
         // Return loading placeholder while loading
         return listOf(S3TreeNode.Loading(node))
+    }
+
+    /**
+     * Gets the instance root nodes from settings.
+     */
+    private fun getInstanceRoots(): List<S3TreeNode> {
+        val settings = S3BrowserAppSettings.getInstance()
+        return settings.instances.map { instance ->
+            S3TreeNode.InstanceRoot(
+                instanceId = instance.id,
+                instanceName = instance.name,
+                endpoint = instance.endpoint
+            )
+        }
     }
 
     /**
@@ -123,17 +141,19 @@ class S3TreeModel(
         val s3Service = S3ClientService.getInstance()
 
         return when (node) {
-            is S3TreeNode.Root -> {
-                s3Service.listBuckets(project).sortedBy { it.name }
+            is S3TreeNode.InstanceRoot -> {
+                s3Service.listBuckets(node.instanceId).sortedBy { it.name }
             }
 
             is S3TreeNode.Bucket -> {
-                val (folders, objects) = s3Service.listObjects(node.name, "", project)
+                val instanceId = node.instanceId
+                val (folders, objects) = s3Service.listObjects(instanceId, node.name, "")
                 (folders.sortedBy { it.name } + objects.sortedBy { it.name })
             }
 
             is S3TreeNode.Folder -> {
-                val (folders, objects) = s3Service.listObjects(node.bucketName, node.fullPrefix, project)
+                val instanceId = node.instanceId
+                val (folders, objects) = s3Service.listObjects(instanceId, node.bucketName, node.fullPrefix)
                 (folders.sortedBy { it.name } + objects.sortedBy { it.name })
             }
 
@@ -147,10 +167,7 @@ class S3TreeModel(
     fun refresh() {
         childrenCache.clear()
         loadingNodes.clear()
-        rootNode = S3TreeNode.Root(
-            S3BrowserProjectSettings.getInstance(project).getEffectiveEndpoint()
-        )
-        fireTreeStructureChanged(rootNode)
+        fireTreeStructureChanged(virtualRoot)
     }
 
     /**
@@ -175,12 +192,18 @@ class S3TreeModel(
      */
     fun findPath(s3Path: String): TreePath? {
         val parts = s3Path.split("/").filter { it.isNotEmpty() }
-        if (parts.isEmpty()) return TreePath(rootNode)
+        if (parts.isEmpty()) return TreePath(virtualRoot)
 
-        val pathElements = mutableListOf<S3TreeNode>(rootNode)
-        var currentNode: S3TreeNode = rootNode
+        val pathElements = mutableListOf<S3TreeNode>(virtualRoot)
 
-        for ((index, part) in parts.withIndex()) {
+        // First part should be instance ID
+        val instanceId = parts.firstOrNull() ?: return null
+        val instanceRoot = getInstanceRoots().find { it.path == instanceId } ?: return null
+        pathElements.add(instanceRoot)
+
+        var currentNode: S3TreeNode = instanceRoot
+
+        for (part in parts.drop(1)) {
             val children = childrenCache[currentNode.path] ?: return null
             val child = children.find { it.name == part } ?: return null
             pathElements.add(child)
@@ -202,52 +225,68 @@ class S3TreeModel(
         val path = mutableListOf<S3TreeNode>()
 
         when (node) {
-            is S3TreeNode.Root -> {
+            is S3TreeNode.VirtualRoot -> {
+                path.add(virtualRoot)
+            }
+            is S3TreeNode.InstanceRoot -> {
+                path.add(virtualRoot)
                 path.add(node)
             }
             is S3TreeNode.Bucket -> {
-                path.add(rootNode)
-                path.add(node)
+                path.add(virtualRoot)
+                val instanceRoot = getInstanceRoots().find { it.instanceId == node.instanceId }
+                if (instanceRoot != null) {
+                    path.add(instanceRoot)
+                    path.add(node)
+                }
             }
             is S3TreeNode.Folder -> {
-                path.add(rootNode)
-                // Find the bucket
-                val bucket = childrenCache[rootNode.path]?.find {
-                    it is S3TreeNode.Bucket && it.name == node.bucketName
-                }
-                if (bucket != null) {
-                    path.add(bucket)
-                    // Build path through folders
-                    val prefixParts = node.prefix.trimEnd('/').split("/")
-                    var currentPrefix = ""
-                    for (part in prefixParts.dropLast(1)) {
-                        currentPrefix += "$part/"
-                        val folder = S3TreeNode.Folder(part, node.bucketName, currentPrefix)
-                        path.add(folder)
+                path.add(virtualRoot)
+                val instanceRoot = getInstanceRoots().find { it.instanceId == node.instanceId }
+                if (instanceRoot != null) {
+                    path.add(instanceRoot)
+                    // Find the bucket
+                    val bucket = childrenCache[instanceRoot.path]?.find {
+                        it is S3TreeNode.Bucket && it.name == node.bucketName
                     }
-                    path.add(node)
+                    if (bucket != null) {
+                        path.add(bucket)
+                        // Build path through folders
+                        val prefixParts = node.prefix.trimEnd('/').split("/")
+                        var currentPrefix = ""
+                        for (part in prefixParts.dropLast(1)) {
+                            currentPrefix += "$part/"
+                            val folder = S3TreeNode.Folder(part, node.instanceId, node.bucketName, currentPrefix)
+                            path.add(folder)
+                        }
+                        path.add(node)
+                    }
                 }
             }
             is S3TreeNode.S3Object -> {
-                path.add(rootNode)
-                val bucket = childrenCache[rootNode.path]?.find {
-                    it is S3TreeNode.Bucket && it.name == node.bucketName
-                }
-                if (bucket != null) {
-                    path.add(bucket)
-                    // Build path through folders
-                    val keyParts = node.key.split("/").dropLast(1)
-                    var currentPrefix = ""
-                    for (part in keyParts) {
-                        currentPrefix += "$part/"
-                        val folder = S3TreeNode.Folder(part, node.bucketName, currentPrefix)
-                        path.add(folder)
+                path.add(virtualRoot)
+                val instanceRoot = getInstanceRoots().find { it.instanceId == node.instanceId }
+                if (instanceRoot != null) {
+                    path.add(instanceRoot)
+                    val bucket = childrenCache[instanceRoot.path]?.find {
+                        it is S3TreeNode.Bucket && it.name == node.bucketName
                     }
-                    path.add(node)
+                    if (bucket != null) {
+                        path.add(bucket)
+                        // Build path through folders
+                        val keyParts = node.key.split("/").dropLast(1)
+                        var currentPrefix = ""
+                        for (part in keyParts) {
+                            currentPrefix += "$part/"
+                            val folder = S3TreeNode.Folder(part, node.instanceId, node.bucketName, currentPrefix)
+                            path.add(folder)
+                        }
+                        path.add(node)
+                    }
                 }
             }
             else -> {
-                path.add(rootNode)
+                path.add(virtualRoot)
             }
         }
 

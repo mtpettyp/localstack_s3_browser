@@ -2,6 +2,7 @@ package com.github.localstack.s3browser.toolwindow
 
 import com.github.localstack.s3browser.model.S3TreeNode
 import com.github.localstack.s3browser.services.S3ClientService
+import com.github.localstack.s3browser.settings.S3SettingsListener
 import com.github.localstack.s3browser.vfs.S3VirtualFileSystem
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
@@ -42,14 +43,26 @@ class S3BrowserPanel(
         setupTree()
         setupToolbar()
         setupDragAndDrop()
+        setupSettingsListener()
 
         Disposer.register(this, treeModel)
+    }
+
+    private fun setupSettingsListener() {
+        val connection = ApplicationManager.getApplication().messageBus.connect(this)
+        connection.subscribe(S3SettingsListener.TOPIC, object : S3SettingsListener {
+            override fun settingsChanged() {
+                SwingUtilities.invokeLater {
+                    refresh()
+                }
+            }
+        })
     }
 
     private fun setupTree() {
         tree.apply {
             cellRenderer = S3TreeCellRenderer()
-            isRootVisible = true
+            isRootVisible = false
             showsRootHandles = true
             selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
 
@@ -189,12 +202,12 @@ class S3BrowserPanel(
     }
 
     private fun handleFileDrop(files: List<File>, targetNode: S3TreeNode?) {
-        val (bucketName, prefix) = when (targetNode) {
-            is S3TreeNode.Bucket -> Pair(targetNode.name, "")
-            is S3TreeNode.Folder -> Pair(targetNode.bucketName, targetNode.fullPrefix)
+        val (instanceId, bucketName, prefix) = when (targetNode) {
+            is S3TreeNode.Bucket -> Triple(targetNode.instanceId, targetNode.name, "")
+            is S3TreeNode.Folder -> Triple(targetNode.instanceId, targetNode.bucketName, targetNode.fullPrefix)
             is S3TreeNode.S3Object -> {
                 val parentPrefix = targetNode.key.substringBeforeLast("/", "")
-                Pair(targetNode.bucketName, if (parentPrefix.isEmpty()) "" else "$parentPrefix/")
+                Triple(targetNode.instanceId, targetNode.bucketName, if (parentPrefix.isEmpty()) "" else "$parentPrefix/")
             }
             else -> {
                 log.warn("Cannot drop files on this node type: ${targetNode?.javaClass?.simpleName}")
@@ -206,7 +219,7 @@ class S3BrowserPanel(
             val s3Service = S3ClientService.getInstance()
             try {
                 for (file in files) {
-                    uploadFileRecursively(s3Service, bucketName, prefix, file)
+                    uploadFileRecursively(s3Service, instanceId, bucketName, prefix, file)
                 }
 
                 SwingUtilities.invokeLater {
@@ -230,16 +243,16 @@ class S3BrowserPanel(
         }
     }
 
-    private fun uploadFileRecursively(s3Service: S3ClientService, bucketName: String, prefix: String, file: File) {
+    private fun uploadFileRecursively(s3Service: S3ClientService, instanceId: String, bucketName: String, prefix: String, file: File) {
         if (file.isDirectory) {
             val newPrefix = "$prefix${file.name}/"
-            s3Service.createFolder(bucketName, newPrefix, project)
+            s3Service.createFolder(instanceId, bucketName, newPrefix)
             file.listFiles()?.forEach { child ->
-                uploadFileRecursively(s3Service, bucketName, newPrefix, child)
+                uploadFileRecursively(s3Service, instanceId, bucketName, newPrefix, child)
             }
         } else {
             val key = "$prefix${file.name}"
-            s3Service.putObject(bucketName, key, file.readBytes(), null, project)
+            s3Service.putObject(instanceId, bucketName, key, file.readBytes(), null)
         }
     }
 
@@ -258,7 +271,7 @@ class S3BrowserPanel(
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 val vfs = S3VirtualFileSystem.getInstance()
-                val virtualFile = vfs.findOrCreateFile(node.bucketName, node.key, project)
+                val virtualFile = vfs.findOrCreateFile(node.instanceId, node.bucketName, node.key)
 
                 SwingUtilities.invokeLater {
                     FileEditorManager.getInstance(project).openFile(virtualFile, true)

@@ -75,11 +75,6 @@
                     text="Refresh"
                     description="Refresh S3 buckets and objects"
                     icon="AllIcons.Actions.Refresh"/>
-            <action id="LocalStackS3.CreateBucket"
-                    class="com.github.localstack.s3browser.actions.CreateBucketAction"
-                    text="Create Bucket"
-                    description="Create a new S3 bucket"
-                    icon="AllIcons.Actions.NewFolder"/>
             <action id="LocalStackS3.Settings"
                     class="com.github.localstack.s3browser.actions.OpenSettingsAction"
                     text="Settings"
@@ -89,6 +84,11 @@
 
         <!-- Context menu actions -->
         <group id="LocalStackS3.ContextMenu" text="S3 Context Menu" popup="true">
+            <action id="LocalStackS3.CreateBucket"
+                    class="com.github.localstack.s3browser.actions.CreateBucketAction"
+                    text="Create Bucket"
+                    description="Create a new S3 bucket"
+                    icon="AllIcons.Actions.NewFolder"/>
             <action id="LocalStackS3.CreateFolder"
                     class="com.github.localstack.s3browser.actions.CreateFolderAction"
                     text="New Folder"

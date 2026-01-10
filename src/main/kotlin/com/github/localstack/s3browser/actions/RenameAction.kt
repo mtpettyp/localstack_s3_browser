@@ -34,6 +34,7 @@ class RenameAction : AnAction() {
 
     private fun renameFile(e: AnActionEvent, node: S3TreeNode.S3Object, panel: S3BrowserPanel) {
         val project = e.getData(CommonDataKeys.PROJECT) ?: return
+        val instanceId = node.instanceId
 
         val newName = Messages.showInputDialog(
             project,
@@ -66,7 +67,7 @@ class RenameAction : AnAction() {
                     vfs.removeFromCache(node.bucketName, node.key)
                 }
 
-                s3Service.renameObject(node.bucketName, node.key, newKey, project)
+                s3Service.renameObject(instanceId, node.bucketName, node.key, newKey)
 
                 SwingUtilities.invokeLater {
                     val parentPath = panel.getSelectedPath()?.parentPath
@@ -91,6 +92,7 @@ class RenameAction : AnAction() {
 
     private fun renameFolder(e: AnActionEvent, node: S3TreeNode.Folder, panel: S3BrowserPanel) {
         val project = e.getData(CommonDataKeys.PROJECT) ?: return
+        val instanceId = node.instanceId
 
         val newName = Messages.showInputDialog(
             project,
@@ -116,12 +118,12 @@ class RenameAction : AnAction() {
                 val s3Service = S3ClientService.getInstance()
 
                 // Get all objects with the old prefix
-                val objects = s3Service.listAllObjects(node.bucketName, oldPrefix, project)
+                val objects = s3Service.listAllObjects(instanceId, node.bucketName, oldPrefix)
 
                 // Copy each object to new location and delete old
                 for (obj in objects) {
                     val newKey = obj.key.replaceFirst(oldPrefix, newPrefix)
-                    s3Service.moveObject(node.bucketName, obj.key, node.bucketName, newKey, project)
+                    s3Service.moveObject(instanceId, node.bucketName, obj.key, node.bucketName, newKey)
                 }
 
                 SwingUtilities.invokeLater {

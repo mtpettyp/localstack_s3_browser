@@ -6,6 +6,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
+import com.intellij.util.xmlb.annotations.XCollection
 
 /**
  * Application-level settings for LocalStack S3 Browser.
@@ -21,38 +22,69 @@ class S3BrowserAppSettings : PersistentStateComponent<S3BrowserAppSettings.State
     private var myState = State()
 
     data class State(
-        var defaultEndpoint: String = DEFAULT_ENDPOINT,
-        var defaultRegion: String = DEFAULT_REGION,
-        var accessKeyId: String = DEFAULT_ACCESS_KEY,
-        var secretAccessKey: String = DEFAULT_SECRET_KEY,
+        @XCollection(style = XCollection.Style.v2)
+        var instances: MutableList<LocalStackInstance> = mutableListOf(),
         var connectionTimeoutMs: Int = DEFAULT_TIMEOUT_MS,
         var autoRefreshEnabled: Boolean = false,
         var autoRefreshIntervalSeconds: Int = 30,
         var confirmDeletions: Boolean = true,
-        var showHiddenFiles: Boolean = false
+        var showHiddenFiles: Boolean = false,
+        // Legacy fields for migration
+        var defaultEndpoint: String = "",
+        var defaultRegion: String = "",
+        var accessKeyId: String = "",
+        var secretAccessKey: String = ""
     )
 
     override fun getState(): State = myState
 
     override fun loadState(state: State) {
         XmlSerializerUtil.copyBean(state, myState)
+        migrateIfNeeded()
     }
 
-    var defaultEndpoint: String
-        get() = myState.defaultEndpoint
-        set(value) { myState.defaultEndpoint = value }
+    /**
+     * Migrate from legacy single-instance config to multi-instance.
+     */
+    private fun migrateIfNeeded() {
+        // If no instances but legacy fields exist, migrate
+        if (myState.instances.isEmpty()) {
+            val legacyEndpoint = myState.defaultEndpoint.ifEmpty { DEFAULT_ENDPOINT }
+            val legacyRegion = myState.defaultRegion.ifEmpty { DEFAULT_REGION }
+            val legacyAccessKey = myState.accessKeyId.ifEmpty { DEFAULT_ACCESS_KEY }
+            val legacySecretKey = myState.secretAccessKey.ifEmpty { DEFAULT_SECRET_KEY }
 
-    var defaultRegion: String
-        get() = myState.defaultRegion
-        set(value) { myState.defaultRegion = value }
+            myState.instances.add(
+                LocalStackInstance(
+                    name = "LocalStack",
+                    endpoint = legacyEndpoint,
+                    region = legacyRegion,
+                    accessKeyId = legacyAccessKey,
+                    secretAccessKey = legacySecretKey
+                )
+            )
+        }
+    }
 
-    var accessKeyId: String
-        get() = myState.accessKeyId
-        set(value) { myState.accessKeyId = value }
+    val instances: MutableList<LocalStackInstance>
+        get() {
+            if (myState.instances.isEmpty()) {
+                migrateIfNeeded()
+            }
+            return myState.instances
+        }
 
-    var secretAccessKey: String
-        get() = myState.secretAccessKey
-        set(value) { myState.secretAccessKey = value }
+    fun addInstance(instance: LocalStackInstance) {
+        myState.instances.add(instance)
+    }
+
+    fun removeInstance(instance: LocalStackInstance) {
+        myState.instances.remove(instance)
+    }
+
+    fun getInstanceById(id: String): LocalStackInstance? {
+        return myState.instances.find { it.id == id }
+    }
 
     var connectionTimeoutMs: Int
         get() = myState.connectionTimeoutMs

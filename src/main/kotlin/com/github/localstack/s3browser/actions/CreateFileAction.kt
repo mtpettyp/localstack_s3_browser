@@ -25,9 +25,9 @@ class CreateFileAction : AnAction() {
         val panel = e.getData(S3BrowserPanel.S3_BROWSER_PANEL) ?: return
         val node = e.getData(S3BrowserPanel.S3_TREE_NODE) ?: return
 
-        val (bucketName, prefix) = when (node) {
-            is S3TreeNode.Bucket -> Pair(node.name, "")
-            is S3TreeNode.Folder -> Pair(node.bucketName, node.fullPrefix)
+        val (instanceId, bucketName, prefix) = when (node) {
+            is S3TreeNode.Bucket -> Triple(node.instanceId, node.name, "")
+            is S3TreeNode.Folder -> Triple(node.instanceId, node.bucketName, node.fullPrefix)
             else -> return
         }
 
@@ -47,7 +47,7 @@ class CreateFileAction : AnAction() {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 // Create empty file
-                S3ClientService.getInstance().putObjectString(bucketName, key, "", null, project)
+                S3ClientService.getInstance().putObjectString(instanceId, bucketName, key, "", null)
 
                 SwingUtilities.invokeLater {
                     panel.treeModel.refreshNode(node)

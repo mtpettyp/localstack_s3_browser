@@ -1,5 +1,6 @@
 package com.github.localstack.s3browser.actions
 
+import com.github.localstack.s3browser.model.S3TreeNode
 import com.github.localstack.s3browser.services.S3ClientService
 import com.github.localstack.s3browser.services.S3OperationException
 import com.github.localstack.s3browser.toolwindow.S3BrowserPanel
@@ -13,12 +14,21 @@ import javax.swing.SwingUtilities
 
 /**
  * Action to create a new S3 bucket.
+ * Only enabled when an InstanceRoot node is selected.
  */
 class CreateBucketAction : AnAction() {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.getData(CommonDataKeys.PROJECT) ?: return
         val panel = e.getData(S3BrowserPanel.S3_BROWSER_PANEL) ?: return
+        val selectedNode = e.getData(S3BrowserPanel.S3_TREE_NODE) ?: return
+
+        // Get the instance ID from the selected node
+        val instanceId = when (selectedNode) {
+            is S3TreeNode.InstanceRoot -> selectedNode.instanceId
+            is S3TreeNode.Bucket -> selectedNode.instanceId
+            else -> return
+        }
 
         val bucketName = Messages.showInputDialog(
             project,
@@ -33,7 +43,7 @@ class CreateBucketAction : AnAction() {
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                S3ClientService.getInstance().createBucket(bucketName, project)
+                S3ClientService.getInstance().createBucket(instanceId, bucketName)
                 SwingUtilities.invokeLater {
                     panel.refresh()
                     Messages.showInfoMessage(
@@ -55,7 +65,9 @@ class CreateBucketAction : AnAction() {
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = e.getData(S3BrowserPanel.S3_BROWSER_PANEL) != null
+        val node = e.getData(S3BrowserPanel.S3_TREE_NODE)
+        // Only enable for InstanceRoot or Bucket nodes
+        e.presentation.isEnabledAndVisible = node is S3TreeNode.InstanceRoot || node is S3TreeNode.Bucket
     }
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT

@@ -10,13 +10,28 @@ sealed class S3TreeNode {
     abstract val path: String
 
     /**
-     * Root node representing the LocalStack connection.
+     * Gets the instance ID for this node, if applicable.
      */
-    data class Root(
+    open val instanceId: String? = null
+
+    /**
+     * Virtual root node that contains all instance roots.
+     */
+    object VirtualRoot : S3TreeNode() {
+        override val name: String = "S3 Instances"
+        override val path: String = ""
+    }
+
+    /**
+     * Root node representing a LocalStack instance.
+     */
+    data class InstanceRoot(
+        override val instanceId: String,
+        val instanceName: String,
         val endpoint: String
     ) : S3TreeNode() {
-        override val name: String = "LocalStack S3"
-        override val path: String = ""
+        override val name: String = instanceName
+        override val path: String = instanceId
     }
 
     /**
@@ -24,9 +39,10 @@ sealed class S3TreeNode {
      */
     data class Bucket(
         override val name: String,
+        override val instanceId: String,
         val creationDate: Instant? = null
     ) : S3TreeNode() {
-        override val path: String = name
+        override val path: String = "$instanceId/$name"
     }
 
     /**
@@ -34,10 +50,11 @@ sealed class S3TreeNode {
      */
     data class Folder(
         override val name: String,
+        override val instanceId: String,
         val bucketName: String,
         val prefix: String
     ) : S3TreeNode() {
-        override val path: String = "$bucketName/$prefix"
+        override val path: String = "$instanceId/$bucketName/$prefix"
 
         val fullPrefix: String
             get() = if (prefix.endsWith("/")) prefix else "$prefix/"
@@ -48,13 +65,14 @@ sealed class S3TreeNode {
      */
     data class S3Object(
         override val name: String,
+        override val instanceId: String,
         val bucketName: String,
         val key: String,
         val size: Long = 0,
         val lastModified: Instant? = null,
         val etag: String? = null
     ) : S3TreeNode() {
-        override val path: String = "$bucketName/$key"
+        override val path: String = "$instanceId/$bucketName/$key"
 
         val extension: String
             get() = name.substringAfterLast('.', "")

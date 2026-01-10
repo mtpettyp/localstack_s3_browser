@@ -1,13 +1,12 @@
 package com.github.localstack.s3browser.services
 
 import com.github.localstack.s3browser.model.S3TreeNode
+import com.github.localstack.s3browser.settings.LocalStackInstance
 import com.github.localstack.s3browser.settings.S3BrowserAppSettings
-import com.github.localstack.s3browser.settings.S3BrowserProjectSettings
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
@@ -17,53 +16,44 @@ import software.amazon.awssdk.services.s3.model.*
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Service for interacting with S3 via LocalStack.
  * This service manages S3 client creation and provides methods for S3 operations.
+ * Supports multiple LocalStack instances.
  */
 @Service(Service.Level.APP)
 class S3ClientService : Disposable {
 
     private val log = Logger.getInstance(S3ClientService::class.java)
-    private var cachedClient: S3Client? = null
-    private var cachedEndpoint: String? = null
-    private var cachedRegion: String? = null
+    private val clientCache = ConcurrentHashMap<String, S3Client>()
 
     /**
-     * Gets or creates an S3 client for the given project.
+     * Gets or creates an S3 client for the given instance ID.
      */
-    fun getClient(project: Project? = null): S3Client {
-        val endpoint: String
-        val region: String
+    fun getClient(instanceId: String): S3Client {
+        val settings = S3BrowserAppSettings.getInstance()
+        val instance = settings.getInstanceById(instanceId)
+            ?: throw S3OperationException("Instance not found: $instanceId")
 
-        if (project != null) {
-            val projectSettings = S3BrowserProjectSettings.getInstance(project)
-            endpoint = projectSettings.getEffectiveEndpoint()
-            region = projectSettings.getEffectiveRegion()
-        } else {
-            val appSettings = S3BrowserAppSettings.getInstance()
-            endpoint = appSettings.defaultEndpoint
-            region = appSettings.defaultRegion
+        return clientCache.getOrPut(instanceId) {
+            createClient(instance)
         }
+    }
 
-        // Return cached client if settings haven't changed
-        if (cachedClient != null && cachedEndpoint == endpoint && cachedRegion == region) {
-            return cachedClient!!
-        }
-
-        // Close existing client if any
-        cachedClient?.close()
-
+    /**
+     * Creates a new S3 client for the given instance configuration.
+     */
+    private fun createClient(instance: LocalStackInstance): S3Client {
         val appSettings = S3BrowserAppSettings.getInstance()
 
-        // Create credentials provider
-        val credentials = AwsBasicCredentials.create(appSettings.accessKeyId, appSettings.secretAccessKey)
+        val credentials = AwsBasicCredentials.create(instance.accessKeyId, instance.secretAccessKey)
         val credentialsProvider = StaticCredentialsProvider.create(credentials)
 
-        cachedClient = S3Client.builder()
-            .endpointOverride(URI.create(endpoint))
-            .region(Region.of(region))
+        val client = S3Client.builder()
+            .endpointOverride(URI.create(instance.endpoint))
+            .region(Region.of(instance.region))
             .credentialsProvider(credentialsProvider)
             .forcePathStyle(true) // Required for LocalStack
             .overrideConfiguration { config ->
@@ -72,39 +62,42 @@ class S3ClientService : Disposable {
             }
             .build()
 
-        cachedEndpoint = endpoint
-        cachedRegion = region
-
-        log.info("Created S3 client for endpoint: $endpoint, region: $region")
-        return cachedClient!!
+        log.info("Created S3 client for instance '${instance.name}' at endpoint: ${instance.endpoint}")
+        return client
     }
 
     /**
-     * Invalidates the cached client, forcing recreation on next access.
+     * Invalidates a cached client for a specific instance.
      */
-    fun invalidateClient() {
-        cachedClient?.close()
-        cachedClient = null
-        cachedEndpoint = null
-        cachedRegion = null
+    fun invalidateClient(instanceId: String) {
+        clientCache.remove(instanceId)?.close()
+    }
+
+    /**
+     * Invalidates all cached clients.
+     */
+    fun invalidateAllClients() {
+        clientCache.values.forEach { it.close() }
+        clientCache.clear()
     }
 
     // ==================== Bucket Operations ====================
 
     /**
-     * Lists all buckets.
+     * Lists all buckets for an instance.
      */
-    fun listBuckets(project: Project? = null): List<S3TreeNode.Bucket> {
+    fun listBuckets(instanceId: String): List<S3TreeNode.Bucket> {
         return try {
-            val response = getClient(project).listBuckets()
+            val response = getClient(instanceId).listBuckets()
             response.buckets().map { bucket ->
                 S3TreeNode.Bucket(
                     name = bucket.name(),
+                    instanceId = instanceId,
                     creationDate = bucket.creationDate()
                 )
             }
         } catch (e: Exception) {
-            log.warn("Failed to list buckets", e)
+            log.warn("Failed to list buckets for instance $instanceId", e)
             throw S3OperationException("Failed to list buckets: ${e.message}", e)
         }
     }
@@ -112,16 +105,16 @@ class S3ClientService : Disposable {
     /**
      * Creates a new bucket.
      */
-    fun createBucket(bucketName: String, project: Project? = null) {
+    fun createBucket(instanceId: String, bucketName: String) {
         try {
-            getClient(project).createBucket(
+            getClient(instanceId).createBucket(
                 CreateBucketRequest.builder()
                     .bucket(bucketName)
                     .build()
             )
-            log.info("Created bucket: $bucketName")
+            log.info("Created bucket: $bucketName on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to create bucket: $bucketName", e)
+            log.warn("Failed to create bucket: $bucketName on instance $instanceId", e)
             throw S3OperationException("Failed to create bucket '$bucketName': ${e.message}", e)
         }
     }
@@ -129,16 +122,16 @@ class S3ClientService : Disposable {
     /**
      * Deletes a bucket. The bucket must be empty.
      */
-    fun deleteBucket(bucketName: String, project: Project? = null) {
+    fun deleteBucket(instanceId: String, bucketName: String) {
         try {
-            getClient(project).deleteBucket(
+            getClient(instanceId).deleteBucket(
                 DeleteBucketRequest.builder()
                     .bucket(bucketName)
                     .build()
             )
-            log.info("Deleted bucket: $bucketName")
+            log.info("Deleted bucket: $bucketName on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to delete bucket: $bucketName", e)
+            log.warn("Failed to delete bucket: $bucketName on instance $instanceId", e)
             throw S3OperationException("Failed to delete bucket '$bucketName': ${e.message}", e)
         }
     }
@@ -146,18 +139,18 @@ class S3ClientService : Disposable {
     /**
      * Deletes a bucket and all its contents.
      */
-    fun deleteBucketRecursively(bucketName: String, project: Project? = null) {
+    fun deleteBucketRecursively(instanceId: String, bucketName: String) {
         try {
             // First, delete all objects in the bucket
-            val objects = listAllObjects(bucketName, "", project)
+            val objects = listAllObjects(instanceId, bucketName, "")
             for (obj in objects) {
-                deleteObject(bucketName, obj.key, project)
+                deleteObject(instanceId, bucketName, obj.key)
             }
             // Then delete the bucket
-            deleteBucket(bucketName, project)
-            log.info("Recursively deleted bucket: $bucketName")
+            deleteBucket(instanceId, bucketName)
+            log.info("Recursively deleted bucket: $bucketName on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to recursively delete bucket: $bucketName", e)
+            log.warn("Failed to recursively delete bucket: $bucketName on instance $instanceId", e)
             throw S3OperationException("Failed to delete bucket '$bucketName' and its contents: ${e.message}", e)
         }
     }
@@ -169,9 +162,9 @@ class S3ClientService : Disposable {
      * Returns both folders (common prefixes) and files.
      */
     fun listObjects(
+        instanceId: String,
         bucketName: String,
-        prefix: String = "",
-        project: Project? = null
+        prefix: String = ""
     ): Pair<List<S3TreeNode.Folder>, List<S3TreeNode.S3Object>> {
         return try {
             val request = ListObjectsV2Request.builder()
@@ -180,13 +173,14 @@ class S3ClientService : Disposable {
                 .delimiter("/")
                 .build()
 
-            val response = getClient(project).listObjectsV2(request)
+            val response = getClient(instanceId).listObjectsV2(request)
 
             val folders = response.commonPrefixes().map { cp ->
                 val folderPrefix = cp.prefix()
                 val name = folderPrefix.trimEnd('/').substringAfterLast('/')
                 S3TreeNode.Folder(
                     name = name,
+                    instanceId = instanceId,
                     bucketName = bucketName,
                     prefix = folderPrefix
                 )
@@ -197,6 +191,7 @@ class S3ClientService : Disposable {
                 .map { obj ->
                     S3TreeNode.S3Object(
                         name = obj.key().substringAfterLast('/'),
+                        instanceId = instanceId,
                         bucketName = bucketName,
                         key = obj.key(),
                         size = obj.size(),
@@ -207,7 +202,7 @@ class S3ClientService : Disposable {
 
             Pair(folders, objects)
         } catch (e: Exception) {
-            log.warn("Failed to list objects in $bucketName/$prefix", e)
+            log.warn("Failed to list objects in $bucketName/$prefix on instance $instanceId", e)
             throw S3OperationException("Failed to list objects: ${e.message}", e)
         }
     }
@@ -216,9 +211,9 @@ class S3ClientService : Disposable {
      * Lists all objects in a bucket (no delimiter, recursive).
      */
     fun listAllObjects(
+        instanceId: String,
         bucketName: String,
-        prefix: String = "",
-        project: Project? = null
+        prefix: String = ""
     ): List<S3TreeNode.S3Object> {
         return try {
             val objects = mutableListOf<S3TreeNode.S3Object>()
@@ -233,11 +228,12 @@ class S3ClientService : Disposable {
                     requestBuilder.continuationToken(continuationToken)
                 }
 
-                val response = getClient(project).listObjectsV2(requestBuilder.build())
+                val response = getClient(instanceId).listObjectsV2(requestBuilder.build())
 
                 objects.addAll(response.contents().map { obj ->
                     S3TreeNode.S3Object(
                         name = obj.key().substringAfterLast('/'),
+                        instanceId = instanceId,
                         bucketName = bucketName,
                         key = obj.key(),
                         size = obj.size(),
@@ -251,7 +247,7 @@ class S3ClientService : Disposable {
 
             objects
         } catch (e: Exception) {
-            log.warn("Failed to list all objects in $bucketName/$prefix", e)
+            log.warn("Failed to list all objects in $bucketName/$prefix on instance $instanceId", e)
             throw S3OperationException("Failed to list objects: ${e.message}", e)
         }
     }
@@ -259,9 +255,9 @@ class S3ClientService : Disposable {
     /**
      * Gets the content of an object as a byte array.
      */
-    fun getObjectContent(bucketName: String, key: String, project: Project? = null): ByteArray {
+    fun getObjectContent(instanceId: String, bucketName: String, key: String): ByteArray {
         return try {
-            val response = getClient(project).getObject(
+            val response = getClient(instanceId).getObject(
                 GetObjectRequest.builder()
                     .bucket(bucketName)
                     .key(key)
@@ -274,7 +270,7 @@ class S3ClientService : Disposable {
             }
             outputStream.toByteArray()
         } catch (e: Exception) {
-            log.warn("Failed to get object content: $bucketName/$key", e)
+            log.warn("Failed to get object content: $bucketName/$key on instance $instanceId", e)
             throw S3OperationException("Failed to get object '$key': ${e.message}", e)
         }
     }
@@ -282,19 +278,19 @@ class S3ClientService : Disposable {
     /**
      * Gets the content of an object as a string.
      */
-    fun getObjectContentAsString(bucketName: String, key: String, project: Project? = null): String {
-        return String(getObjectContent(bucketName, key, project), Charsets.UTF_8)
+    fun getObjectContentAsString(instanceId: String, bucketName: String, key: String): String {
+        return String(getObjectContent(instanceId, bucketName, key), Charsets.UTF_8)
     }
 
     /**
      * Uploads content to an S3 object.
      */
     fun putObject(
+        instanceId: String,
         bucketName: String,
         key: String,
         content: ByteArray,
-        contentType: String? = null,
-        project: Project? = null
+        contentType: String? = null
     ) {
         try {
             val requestBuilder = PutObjectRequest.builder()
@@ -305,13 +301,13 @@ class S3ClientService : Disposable {
                 requestBuilder.contentType(contentType)
             }
 
-            getClient(project).putObject(
+            getClient(instanceId).putObject(
                 requestBuilder.build(),
                 RequestBody.fromBytes(content)
             )
-            log.info("Uploaded object: $bucketName/$key (${content.size} bytes)")
+            log.info("Uploaded object: $bucketName/$key (${content.size} bytes) on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to put object: $bucketName/$key", e)
+            log.warn("Failed to put object: $bucketName/$key on instance $instanceId", e)
             throw S3OperationException("Failed to upload '$key': ${e.message}", e)
         }
     }
@@ -320,29 +316,29 @@ class S3ClientService : Disposable {
      * Uploads string content to an S3 object.
      */
     fun putObjectString(
+        instanceId: String,
         bucketName: String,
         key: String,
         content: String,
-        contentType: String? = "text/plain",
-        project: Project? = null
+        contentType: String? = "text/plain"
     ) {
-        putObject(bucketName, key, content.toByteArray(Charsets.UTF_8), contentType, project)
+        putObject(instanceId, bucketName, key, content.toByteArray(Charsets.UTF_8), contentType)
     }
 
     /**
      * Deletes an object.
      */
-    fun deleteObject(bucketName: String, key: String, project: Project? = null) {
+    fun deleteObject(instanceId: String, bucketName: String, key: String) {
         try {
-            getClient(project).deleteObject(
+            getClient(instanceId).deleteObject(
                 DeleteObjectRequest.builder()
                     .bucket(bucketName)
                     .key(key)
                     .build()
             )
-            log.info("Deleted object: $bucketName/$key")
+            log.info("Deleted object: $bucketName/$key on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to delete object: $bucketName/$key", e)
+            log.warn("Failed to delete object: $bucketName/$key on instance $instanceId", e)
             throw S3OperationException("Failed to delete '$key': ${e.message}", e)
         }
     }
@@ -350,15 +346,15 @@ class S3ClientService : Disposable {
     /**
      * Deletes all objects with the given prefix (folder deletion).
      */
-    fun deleteObjectsWithPrefix(bucketName: String, prefix: String, project: Project? = null) {
+    fun deleteObjectsWithPrefix(instanceId: String, bucketName: String, prefix: String) {
         try {
-            val objects = listAllObjects(bucketName, prefix, project)
+            val objects = listAllObjects(instanceId, bucketName, prefix)
             for (obj in objects) {
-                deleteObject(bucketName, obj.key, project)
+                deleteObject(instanceId, bucketName, obj.key)
             }
-            log.info("Deleted ${objects.size} objects with prefix: $bucketName/$prefix")
+            log.info("Deleted ${objects.size} objects with prefix: $bucketName/$prefix on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to delete objects with prefix: $bucketName/$prefix", e)
+            log.warn("Failed to delete objects with prefix: $bucketName/$prefix on instance $instanceId", e)
             throw S3OperationException("Failed to delete folder '$prefix': ${e.message}", e)
         }
     }
@@ -367,14 +363,14 @@ class S3ClientService : Disposable {
      * Copies an object to a new location.
      */
     fun copyObject(
+        instanceId: String,
         sourceBucket: String,
         sourceKey: String,
         destBucket: String,
-        destKey: String,
-        project: Project? = null
+        destKey: String
     ) {
         try {
-            getClient(project).copyObject(
+            getClient(instanceId).copyObject(
                 CopyObjectRequest.builder()
                     .sourceBucket(sourceBucket)
                     .sourceKey(sourceKey)
@@ -382,9 +378,9 @@ class S3ClientService : Disposable {
                     .destinationKey(destKey)
                     .build()
             )
-            log.info("Copied object: $sourceBucket/$sourceKey -> $destBucket/$destKey")
+            log.info("Copied object: $sourceBucket/$sourceKey -> $destBucket/$destKey on instance $instanceId")
         } catch (e: Exception) {
-            log.warn("Failed to copy object: $sourceBucket/$sourceKey -> $destBucket/$destKey", e)
+            log.warn("Failed to copy object: $sourceBucket/$sourceKey -> $destBucket/$destKey on instance $instanceId", e)
             throw S3OperationException("Failed to copy '$sourceKey' to '$destKey': ${e.message}", e)
         }
     }
@@ -393,49 +389,48 @@ class S3ClientService : Disposable {
      * Moves an object to a new location (copy + delete).
      */
     fun moveObject(
+        instanceId: String,
         sourceBucket: String,
         sourceKey: String,
         destBucket: String,
-        destKey: String,
-        project: Project? = null
+        destKey: String
     ) {
-        copyObject(sourceBucket, sourceKey, destBucket, destKey, project)
-        deleteObject(sourceBucket, sourceKey, project)
-        log.info("Moved object: $sourceBucket/$sourceKey -> $destBucket/$destKey")
+        copyObject(instanceId, sourceBucket, sourceKey, destBucket, destKey)
+        deleteObject(instanceId, sourceBucket, sourceKey)
+        log.info("Moved object: $sourceBucket/$sourceKey -> $destBucket/$destKey on instance $instanceId")
     }
 
     /**
      * Renames an object within the same bucket.
      */
-    fun renameObject(bucketName: String, oldKey: String, newKey: String, project: Project? = null) {
-        moveObject(bucketName, oldKey, bucketName, newKey, project)
+    fun renameObject(instanceId: String, bucketName: String, oldKey: String, newKey: String) {
+        moveObject(instanceId, bucketName, oldKey, bucketName, newKey)
     }
 
     /**
      * Creates a folder marker (empty object with trailing slash).
      */
-    fun createFolder(bucketName: String, folderPath: String, project: Project? = null) {
+    fun createFolder(instanceId: String, bucketName: String, folderPath: String) {
         val normalizedPath = if (folderPath.endsWith("/")) folderPath else "$folderPath/"
-        putObject(bucketName, normalizedPath, ByteArray(0), "application/x-directory", project)
-        log.info("Created folder: $bucketName/$normalizedPath")
+        putObject(instanceId, bucketName, normalizedPath, ByteArray(0), "application/x-directory")
+        log.info("Created folder: $bucketName/$normalizedPath on instance $instanceId")
     }
 
     /**
-     * Tests the connection to S3.
+     * Tests the connection to S3 for a specific instance.
      */
-    fun testConnection(project: Project? = null): Boolean {
+    fun testConnection(instanceId: String): Boolean {
         return try {
-            getClient(project).listBuckets()
+            getClient(instanceId).listBuckets()
             true
         } catch (e: Exception) {
-            log.info("Connection test failed", e)
+            log.info("Connection test failed for instance $instanceId", e)
             false
         }
     }
 
     override fun dispose() {
-        cachedClient?.close()
-        cachedClient = null
+        invalidateAllClients()
     }
 
     companion object {

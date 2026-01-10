@@ -23,6 +23,7 @@ class DeleteBucketAction : AnAction() {
         val panel = e.getData(S3BrowserPanel.S3_BROWSER_PANEL) ?: return
         val node = e.getData(S3BrowserPanel.S3_TREE_NODE) as? S3TreeNode.Bucket ?: return
 
+        val instanceId = node.instanceId
         val settings = S3BrowserAppSettings.getInstance()
 
         if (settings.confirmDeletions) {
@@ -40,7 +41,7 @@ class DeleteBucketAction : AnAction() {
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                S3ClientService.getInstance().deleteBucketRecursively(node.name, project)
+                S3ClientService.getInstance().deleteBucketRecursively(instanceId, node.name)
                 SwingUtilities.invokeLater {
                     panel.refresh()
                     Messages.showInfoMessage(

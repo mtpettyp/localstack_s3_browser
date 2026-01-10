@@ -1,5 +1,6 @@
 package com.github.localstack.s3browser.actions
 
+import com.github.localstack.s3browser.settings.S3BrowserAppConfigurable
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -15,7 +16,7 @@ class OpenSettingsAction : AnAction() {
         val project = e.getData(CommonDataKeys.PROJECT)
         ShowSettingsUtil.getInstance().showSettingsDialog(
             project,
-            "com.github.localstack.s3browser.settings.S3BrowserAppConfigurable"
+            S3BrowserAppConfigurable::class.java
         )
     }
 

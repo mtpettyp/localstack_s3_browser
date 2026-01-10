@@ -8,7 +8,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
@@ -31,9 +30,9 @@ class UploadFileAction : AnAction() {
         val panel = e.getData(S3BrowserPanel.S3_BROWSER_PANEL) ?: return
         val node = e.getData(S3BrowserPanel.S3_TREE_NODE) ?: return
 
-        val (bucketName, prefix) = when (node) {
-            is S3TreeNode.Bucket -> Pair(node.name, "")
-            is S3TreeNode.Folder -> Pair(node.bucketName, node.fullPrefix)
+        val (instanceId, bucketName, prefix) = when (node) {
+            is S3TreeNode.Bucket -> Triple(node.instanceId, node.name, "")
+            is S3TreeNode.Folder -> Triple(node.instanceId, node.bucketName, node.fullPrefix)
             else -> return
         }
 
@@ -57,7 +56,7 @@ class UploadFileAction : AnAction() {
                     for (vFile in files) {
                         val file = File(vFile.path)
                         uploadedFiles = uploadFileRecursively(
-                            s3Service, bucketName, prefix, file,
+                            s3Service, instanceId, bucketName, prefix, file,
                             indicator, uploadedFiles, totalFiles
                         )
                     }
@@ -102,6 +101,7 @@ class UploadFileAction : AnAction() {
 
     private fun uploadFileRecursively(
         s3Service: S3ClientService,
+        instanceId: String,
         bucketName: String,
         prefix: String,
         file: File,
@@ -117,16 +117,16 @@ class UploadFileAction : AnAction() {
 
         if (file.isDirectory) {
             val newPrefix = "$prefix${file.name}/"
-            s3Service.createFolder(bucketName, newPrefix, null)
+            s3Service.createFolder(instanceId, bucketName, newPrefix)
             file.listFiles()?.forEach { child ->
-                count = uploadFileRecursively(s3Service, bucketName, newPrefix, child, indicator, count, totalCount)
+                count = uploadFileRecursively(s3Service, instanceId, bucketName, newPrefix, child, indicator, count, totalCount)
             }
         } else {
             val key = "$prefix${file.name}"
             indicator.text = "Uploading: ${file.name}"
             indicator.fraction = count.toDouble() / totalCount
 
-            s3Service.putObject(bucketName, key, file.readBytes(), null, null)
+            s3Service.putObject(instanceId, bucketName, key, file.readBytes(), null)
             count++
         }
 

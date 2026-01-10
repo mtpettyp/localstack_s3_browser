@@ -29,6 +29,7 @@ class DeleteAction : AnAction() {
             return
         }
 
+        val instanceId = node.instanceId ?: return
         val settings = S3BrowserAppSettings.getInstance()
 
         val itemName = when (node) {
@@ -62,10 +63,10 @@ class DeleteAction : AnAction() {
                             }
                             vfs.removeFromCache(node.bucketName, node.key)
                         }
-                        s3Service.deleteObject(node.bucketName, node.key, project)
+                        s3Service.deleteObject(instanceId, node.bucketName, node.key)
                     }
                     is S3TreeNode.Folder -> {
-                        s3Service.deleteObjectsWithPrefix(node.bucketName, node.fullPrefix, project)
+                        s3Service.deleteObjectsWithPrefix(instanceId, node.bucketName, node.fullPrefix)
                     }
                     else -> return@executeOnPooledThread
                 }

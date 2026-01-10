@@ -30,9 +30,14 @@ class S3TreeCellRenderer : ColoredTreeCellRenderer() {
         hasFocus: Boolean
     ) {
         when (val node = value) {
-            is S3TreeNode.Root -> {
+            is S3TreeNode.VirtualRoot -> {
                 icon = AllIcons.Nodes.PpWeb
-                append(node.name)
+                append("S3 Instances")
+            }
+
+            is S3TreeNode.InstanceRoot -> {
+                icon = AllIcons.Nodes.PpWeb
+                append(node.instanceName)
                 append(" (${node.endpoint})", SimpleTextAttributes.GRAYED_ATTRIBUTES)
             }
 

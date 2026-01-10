@@ -43,10 +43,24 @@ class S3VirtualFileSystem : VirtualFileSystem() {
     /**
      * Finds or creates a virtual file for an S3 object.
      */
+    fun findOrCreateFile(instanceId: String, bucketName: String, key: String): S3VirtualFile {
+        val path = "$instanceId/$bucketName/$key"
+        return fileCache.getOrPut(path) {
+            S3VirtualFile(this, instanceId, bucketName, key)
+        }
+    }
+
+    /**
+     * Legacy method for backwards compatibility - uses empty instance ID.
+     */
     fun findOrCreateFile(bucketName: String, key: String, project: Project): S3VirtualFile {
+        // For backwards compatibility, use bucket/key as path
         val path = "$bucketName/$key"
         return fileCache.getOrPut(path) {
-            S3VirtualFile(this, bucketName, key, project)
+            // Try to find the instance ID from the first available instance
+            val settings = com.github.localstack.s3browser.settings.S3BrowserAppSettings.getInstance()
+            val instanceId = settings.instances.firstOrNull()?.id ?: ""
+            S3VirtualFile(this, instanceId, bucketName, key)
         }
     }
 
@@ -54,8 +68,12 @@ class S3VirtualFileSystem : VirtualFileSystem() {
      * Removes a file from the cache.
      */
     fun removeFromCache(bucketName: String, key: String) {
+        // Remove using old path format
         val path = "$bucketName/$key"
         fileCache.remove(path)
+        // Also try to remove using any instance prefix
+        val keysToRemove = fileCache.keys.filter { it.endsWith("/$bucketName/$key") }
+        keysToRemove.forEach { fileCache.remove(it) }
     }
 
     /**
@@ -103,9 +121,9 @@ class S3VirtualFileSystem : VirtualFileSystem() {
  */
 class S3VirtualFile(
     private val fileSystem: S3VirtualFileSystem,
+    val instanceId: String,
     val bucketName: String,
-    val key: String,
-    private val project: Project
+    val key: String
 ) : VirtualFile() {
 
     private val log = Logger.getInstance(S3VirtualFile::class.java)
@@ -161,7 +179,7 @@ class S3VirtualFile(
         cachedContent?.let { return it }
 
         return try {
-            val content = S3ClientService.getInstance().getObjectContent(bucketName, key, project)
+            val content = S3ClientService.getInstance().getObjectContent(instanceId, bucketName, key)
             cachedContent = content
             content
         } catch (e: Exception) {
@@ -195,7 +213,7 @@ class S3VirtualFile(
         if (!dirty) return
 
         try {
-            S3ClientService.getInstance().putObject(bucketName, key, content, null, project)
+            S3ClientService.getInstance().putObject(instanceId, bucketName, key, content, null)
             dirty = false
             log.info("Saved $path to S3")
         } catch (e: Exception) {
@@ -221,10 +239,13 @@ class S3VirtualFile(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is S3VirtualFile) return false
-        return bucketName == other.bucketName && key == other.key
+        return instanceId == other.instanceId && bucketName == other.bucketName && key == other.key
     }
 
     override fun hashCode(): Int {
-        return 31 * bucketName.hashCode() + key.hashCode()
+        var result = instanceId.hashCode()
+        result = 31 * result + bucketName.hashCode()
+        result = 31 * result + key.hashCode()
+        return result
     }
 }

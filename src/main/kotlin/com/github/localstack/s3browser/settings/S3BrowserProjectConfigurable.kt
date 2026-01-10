@@ -35,10 +35,14 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
             }
 
             group("Project Connection Settings") {
+                val firstInstance = appSettings.instances.firstOrNull()
+                val defaultEndpoint = firstInstance?.endpoint ?: S3BrowserAppSettings.DEFAULT_ENDPOINT
+                val defaultRegion = firstInstance?.region ?: S3BrowserAppSettings.DEFAULT_REGION
+
                 row("Endpoint:") {
                     endpointField = textField()
                         .columns(COLUMNS_LARGE)
-                        .comment("Leave empty to use application default: ${appSettings.defaultEndpoint}")
+                        .comment("Leave empty to use application default: $defaultEndpoint")
                         .enabledIf(useProjectSettingsCell!!.selected)
                         .component
                     endpointField?.text = settings.endpoint
@@ -46,7 +50,7 @@ class S3BrowserProjectConfigurable(private val project: Project) : Configurable 
                 row("Region:") {
                     regionField = textField()
                         .columns(COLUMNS_MEDIUM)
-                        .comment("Leave empty to use application default: ${appSettings.defaultRegion}")
+                        .comment("Leave empty to use application default: $defaultRegion")
                         .enabledIf(useProjectSettingsCell!!.selected)
                         .component
                     regionField?.text = settings.region

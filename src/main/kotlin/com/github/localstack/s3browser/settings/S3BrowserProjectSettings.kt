@@ -61,7 +61,8 @@ class S3BrowserProjectSettings : PersistentStateComponent<S3BrowserProjectSettin
         return if (useProjectSettings && endpoint.isNotBlank()) {
             endpoint
         } else {
-            S3BrowserAppSettings.getInstance().defaultEndpoint
+            S3BrowserAppSettings.getInstance().instances.firstOrNull()?.endpoint
+                ?: S3BrowserAppSettings.DEFAULT_ENDPOINT
         }
     }
 
@@ -72,7 +73,8 @@ class S3BrowserProjectSettings : PersistentStateComponent<S3BrowserProjectSettin
         return if (useProjectSettings && region.isNotBlank()) {
             region
         } else {
-            S3BrowserAppSettings.getInstance().defaultRegion
+            S3BrowserAppSettings.getInstance().instances.firstOrNull()?.region
+                ?: S3BrowserAppSettings.DEFAULT_REGION
         }
     }
 
