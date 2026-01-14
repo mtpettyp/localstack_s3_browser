@@ -408,6 +408,27 @@ class S3ClientService : Disposable {
     }
 
     /**
+     * Touches an object, updating its last modified timestamp by copying it in place.
+     */
+    fun touchObject(instanceId: String, bucketName: String, key: String) {
+        try {
+            getClient(instanceId).copyObject(
+                CopyObjectRequest.builder()
+                    .sourceBucket(bucketName)
+                    .sourceKey(key)
+                    .destinationBucket(bucketName)
+                    .destinationKey(key)
+                    .metadataDirective(MetadataDirective.REPLACE)
+                    .build()
+            )
+            log.info("Touched object: $bucketName/$key on instance $instanceId")
+        } catch (e: Exception) {
+            log.warn("Failed to touch object: $bucketName/$key on instance $instanceId", e)
+            throw S3OperationException("Failed to touch '$key': ${e.message}", e)
+        }
+    }
+
+    /**
      * Creates a folder marker (empty object with trailing slash).
      */
     fun createFolder(instanceId: String, bucketName: String, folderPath: String) {

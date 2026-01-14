@@ -110,6 +110,10 @@
                     text="Rename"
                     description="Rename the selected item"
                     icon="AllIcons.Actions.Edit"/>
+            <action id="LocalStackS3.Touch"
+                    class="com.github.localstack.s3browser.actions.TouchAction"
+                    text="Touch"
+                    description="Update last modified timestamp"/>
             <action id="LocalStackS3.Delete"
                     class="com.github.localstack.s3browser.actions.DeleteAction"
                     text="Delete"
