@@ -125,6 +125,11 @@
                     text="Copy"
                     description="Copy file or folder to clipboard"
                     icon="AllIcons.Actions.Copy"/>
+            <action id="LocalStackS3.Paste"
+                    class="com.github.localstack.s3browser.actions.PasteAction"
+                    text="Paste"
+                    description="Paste files from clipboard to S3"
+                    icon="AllIcons.Actions.MenuPaste"/>
             <action id="LocalStackS3.CopyPath"
                     class="com.github.localstack.s3browser.actions.CopyPathAction"
                     text="Copy S3 Path"

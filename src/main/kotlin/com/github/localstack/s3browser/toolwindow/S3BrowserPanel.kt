@@ -121,6 +121,11 @@ class S3BrowserPanel(
                                 e.modifiersEx and java.awt.event.InputEvent.CTRL_DOWN_MASK != 0)) {
                         // CMD+C (Mac) or CTRL+C (Windows/Linux) to copy files
                         copySelectedToClipboard()
+                    } else if (e.keyCode == java.awt.event.KeyEvent.VK_V &&
+                               (e.modifiersEx and java.awt.event.InputEvent.META_DOWN_MASK != 0 ||
+                                e.modifiersEx and java.awt.event.InputEvent.CTRL_DOWN_MASK != 0)) {
+                        // CMD+V (Mac) or CTRL+V (Windows/Linux) to paste files
+                        pasteFromClipboard()
                     }
                 }
             })
@@ -158,7 +163,7 @@ class S3BrowserPanel(
         // Setup drop target for dropping files into the tree
         DropTarget(tree, DnDConstants.ACTION_COPY, object : DropTargetListener {
             override fun dragEnter(dtde: DropTargetDragEvent) {
-                if (isFileDrag(dtde)) {
+                if (isSupportedDrag(dtde)) {
                     dtde.acceptDrag(DnDConstants.ACTION_COPY)
                 } else {
                     dtde.rejectDrag()
@@ -166,7 +171,7 @@ class S3BrowserPanel(
             }
 
             override fun dragOver(dtde: DropTargetDragEvent) {
-                if (isFileDrag(dtde)) {
+                if (isSupportedDrag(dtde)) {
                     val path = tree.getPathForLocation(dtde.location.x, dtde.location.y)
                     if (path != null) {
                         tree.selectionPath = path
@@ -183,7 +188,7 @@ class S3BrowserPanel(
 
             override fun drop(dtde: DropTargetDropEvent) {
                 try {
-                    if (!isFileDrop(dtde)) {
+                    if (!isSupportedDrop(dtde)) {
                         dtde.rejectDrop()
                         return
                     }
@@ -191,18 +196,30 @@ class S3BrowserPanel(
                     dtde.acceptDrop(DnDConstants.ACTION_COPY)
 
                     val transferable = dtde.transferable
-                    val files = transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<*>
-
-                    if (files.isNullOrEmpty()) {
-                        dtde.dropComplete(false)
-                        return
-                    }
-
                     val dropPath = tree.getPathForLocation(dtde.location.x, dtde.location.y)
                     val targetNode = dropPath?.lastPathComponent as? S3TreeNode
 
-                    handleFileDrop(files.filterIsInstance<File>(), targetNode)
-                    dtde.dropComplete(true)
+                    // Check for S3 node data first (internal drag and drop)
+                    if (transferable.isDataFlavorSupported(S3NodeTransferData.DATA_FLAVOR)) {
+                        val s3Data = transferable.getTransferData(S3NodeTransferData.DATA_FLAVOR) as S3NodeTransferData
+                        handleS3NodeDrop(s3Data, targetNode)
+                        dtde.dropComplete(true)
+                        return
+                    }
+
+                    // Fall back to file list (external drag)
+                    if (transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                        val files = transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<*>
+                        if (files.isNullOrEmpty()) {
+                            dtde.dropComplete(false)
+                            return
+                        }
+                        handleFileDrop(files.filterIsInstance<File>(), targetNode)
+                        dtde.dropComplete(true)
+                        return
+                    }
+
+                    dtde.dropComplete(false)
 
                 } catch (e: Exception) {
                     log.warn("Drop failed", e)
@@ -210,14 +227,113 @@ class S3BrowserPanel(
                 }
             }
 
-            private fun isFileDrag(dtde: DropTargetDragEvent): Boolean {
-                return dtde.transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
+            private fun isSupportedDrag(dtde: DropTargetDragEvent): Boolean {
+                return dtde.transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ||
+                        dtde.transferable.isDataFlavorSupported(S3NodeTransferData.DATA_FLAVOR)
             }
 
-            private fun isFileDrop(dtde: DropTargetDropEvent): Boolean {
-                return dtde.transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
+            private fun isSupportedDrop(dtde: DropTargetDropEvent): Boolean {
+                return dtde.transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ||
+                        dtde.transferable.isDataFlavorSupported(S3NodeTransferData.DATA_FLAVOR)
             }
         })
+    }
+
+    private fun handleS3NodeDrop(s3Data: S3NodeTransferData, targetNode: S3TreeNode?) {
+        val (destInstanceId, destBucket, destPrefix) = when (targetNode) {
+            is S3TreeNode.Bucket -> Triple(targetNode.instanceId, targetNode.name, "")
+            is S3TreeNode.Folder -> Triple(targetNode.instanceId, targetNode.bucketName, targetNode.fullPrefix)
+            is S3TreeNode.S3Object -> {
+                val parentPrefix = targetNode.key.substringBeforeLast("/", "")
+                Triple(targetNode.instanceId, targetNode.bucketName, if (parentPrefix.isEmpty()) "" else "$parentPrefix/")
+            }
+            else -> {
+                log.warn("Cannot drop S3 items on this node type: ${targetNode?.javaClass?.simpleName}")
+                return
+            }
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val s3Service = S3ClientService.getInstance()
+            try {
+                when (s3Data.nodeType) {
+                    S3NodeTransferData.NodeType.S3_OBJECT -> {
+                        val newKey = destPrefix + s3Data.name
+                        if (s3Data.instanceId != destInstanceId) {
+                            // Cross-instance copy: download and re-upload
+                            val content = s3Service.getObjectContent(s3Data.instanceId, s3Data.bucketName, s3Data.key)
+                            s3Service.putObject(destInstanceId, destBucket, newKey, content, null)
+                        } else {
+                            s3Service.copyObject(s3Data.instanceId, s3Data.bucketName, s3Data.key, destBucket, newKey)
+                        }
+                        log.info("Dropped S3 object: ${s3Data.bucketName}/${s3Data.key} -> $destBucket/$newKey")
+                    }
+                    S3NodeTransferData.NodeType.FOLDER -> {
+                        copyS3FolderRecursively(
+                            s3Service, s3Data.instanceId, s3Data.bucketName, s3Data.key,
+                            destInstanceId, destBucket, destPrefix + s3Data.name + "/"
+                        )
+                        log.info("Dropped S3 folder: ${s3Data.bucketName}/${s3Data.key} -> $destBucket/$destPrefix${s3Data.name}/")
+                    }
+                    S3NodeTransferData.NodeType.BUCKET -> {
+                        copyS3FolderRecursively(
+                            s3Service, s3Data.instanceId, s3Data.bucketName, "",
+                            destInstanceId, destBucket, destPrefix + s3Data.name + "/"
+                        )
+                        log.info("Dropped S3 bucket: ${s3Data.bucketName} -> $destBucket/$destPrefix${s3Data.name}/")
+                    }
+                }
+
+                SwingUtilities.invokeLater {
+                    when (targetNode) {
+                        is S3TreeNode.Bucket -> treeModel.refreshNode(targetNode)
+                        is S3TreeNode.Folder -> treeModel.refreshNode(targetNode)
+                        is S3TreeNode.S3Object -> {
+                            val parentPath = tree.selectionPath?.parentPath
+                            val parentNode = parentPath?.lastPathComponent as? S3TreeNode
+                            if (parentNode != null) {
+                                treeModel.refreshNode(parentNode)
+                            }
+                        }
+                        else -> refresh()
+                    }
+                }
+            } catch (e: Exception) {
+                log.warn("Failed to drop S3 items", e)
+            }
+        }
+    }
+
+    private fun copyS3FolderRecursively(
+        s3Service: S3ClientService,
+        srcInstanceId: String,
+        srcBucket: String,
+        srcPrefix: String,
+        destInstanceId: String,
+        destBucket: String,
+        destPrefix: String
+    ) {
+        val objects = s3Service.listAllObjects(srcInstanceId, srcBucket, srcPrefix)
+
+        for (obj in objects) {
+            val relativePath = if (srcPrefix.isNotEmpty()) {
+                obj.key.removePrefix(srcPrefix)
+            } else {
+                obj.key
+            }
+
+            if (relativePath.isEmpty()) continue
+
+            val destKey = destPrefix + relativePath
+
+            if (srcInstanceId != destInstanceId) {
+                // Cross-instance copy: download and re-upload
+                val content = s3Service.getObjectContent(srcInstanceId, srcBucket, obj.key)
+                s3Service.putObject(destInstanceId, destBucket, destKey, content, null)
+            } else {
+                s3Service.copyObject(srcInstanceId, srcBucket, obj.key, destBucket, destKey)
+            }
+        }
     }
 
     private fun handleFileDrop(files: List<File>, targetNode: S3TreeNode?) {
@@ -320,6 +436,17 @@ class S3BrowserPanel(
                 log.warn("Failed to copy to clipboard: ${node.path}", e)
             }
         }
+    }
+
+    private fun pasteFromClipboard() {
+        val action = ActionManager.getInstance().getAction("LocalStackS3.Paste")
+        val event = AnActionEvent.createFromAnAction(
+            action,
+            null,
+            ActionPlaces.TOOLWINDOW_CONTENT,
+            createDataContext()
+        )
+        action.actionPerformed(event)
     }
 
     fun refresh() {

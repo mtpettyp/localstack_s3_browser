@@ -10,7 +10,9 @@ import java.io.File
 
 /**
  * Transferable implementation for S3 files.
- * Downloads files to a temp directory when dragged out.
+ * Supports two data flavors:
+ * 1. S3NodeTransferData - for efficient S3-to-S3 copy operations
+ * 2. javaFileListFlavor - downloads files to temp directory for external paste
  */
 class S3FileTransferable(
     private val node: S3TreeNode,
@@ -19,26 +21,36 @@ class S3FileTransferable(
 
     private val log = Logger.getInstance(S3FileTransferable::class.java)
 
+    private val s3NodeData: S3NodeTransferData? = S3NodeTransferData.fromNode(node)
+
     companion object {
-        private val supportedFlavors = arrayOf(DataFlavor.javaFileListFlavor)
+        private val supportedFlavors = arrayOf(
+            S3NodeTransferData.DATA_FLAVOR,
+            DataFlavor.javaFileListFlavor
+        )
     }
 
     override fun getTransferDataFlavors(): Array<DataFlavor> = supportedFlavors
 
     override fun isDataFlavorSupported(flavor: DataFlavor): Boolean {
-        return flavor == DataFlavor.javaFileListFlavor
+        return flavor == DataFlavor.javaFileListFlavor ||
+                flavor == S3NodeTransferData.DATA_FLAVOR
     }
 
     override fun getTransferData(flavor: DataFlavor): Any {
-        if (!isDataFlavorSupported(flavor)) {
-            throw UnsupportedFlavorException(flavor)
-        }
-
-        return when (node) {
-            is S3TreeNode.S3Object -> listOf(downloadFile(node))
-            is S3TreeNode.Folder -> listOf(downloadFolder(node))
-            is S3TreeNode.Bucket -> listOf(downloadBucket(node))
-            else -> emptyList<File>()
+        return when {
+            flavor == S3NodeTransferData.DATA_FLAVOR -> {
+                s3NodeData ?: throw UnsupportedFlavorException(flavor)
+            }
+            flavor == DataFlavor.javaFileListFlavor -> {
+                when (node) {
+                    is S3TreeNode.S3Object -> listOf(downloadFile(node))
+                    is S3TreeNode.Folder -> listOf(downloadFolder(node))
+                    is S3TreeNode.Bucket -> listOf(downloadBucket(node))
+                    else -> emptyList<File>()
+                }
+            }
+            else -> throw UnsupportedFlavorException(flavor)
         }
     }
 
