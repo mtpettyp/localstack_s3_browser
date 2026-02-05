@@ -139,6 +139,11 @@
                     text="Download..."
                     description="Download S3 object to local filesystem"
                     icon="AllIcons.Actions.Download"/>
+            <action id="LocalStackS3.CreateZip"
+                    class="com.github.localstack.s3browser.actions.CreateZipAction"
+                    text="Create Zip..."
+                    description="Create a zip archive from selected S3 items"
+                    icon="AllIcons.FileTypes.Archive"/>
             <separator/>
             <action id="LocalStackS3.DeleteBucket"
                     class="com.github.localstack.s3browser.actions.DeleteBucketAction"
