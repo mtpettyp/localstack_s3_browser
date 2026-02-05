@@ -408,6 +408,9 @@ class S3BrowserPanel(
                 val vfs = S3VirtualFileSystem.getInstance()
                 val virtualFile = vfs.findOrCreateFile(node.instanceId, node.bucketName, node.key)
 
+                // Force a fresh load from S3 to detect if the object still exists
+                virtualFile.refresh(false, false)
+
                 SwingUtilities.invokeLater {
                     FileEditorManager.getInstance(project).openFile(virtualFile, true)
                 }

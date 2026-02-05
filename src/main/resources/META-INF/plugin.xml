@@ -55,6 +55,10 @@
                 key="s3"
                 implementationClass="com.github.localstack.s3browser.vfs.S3VirtualFileSystem"/>
 
+        <!-- Editor notification for missing S3 objects -->
+        <editorNotificationProvider
+                implementation="com.github.localstack.s3browser.vfs.S3EditorNotificationProvider"/>
+
         <!-- Notifications -->
         <notificationGroup
                 id="LocalStack S3 Browser"
