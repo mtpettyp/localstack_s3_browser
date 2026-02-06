@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.ui.EditorNotifications
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
@@ -408,8 +409,15 @@ class S3BrowserPanel(
                 val vfs = S3VirtualFileSystem.getInstance()
                 val virtualFile = vfs.findOrCreateFile(node.instanceId, node.bucketName, node.key)
 
+                // Force a fresh load from S3 to detect if the object still exists
+                virtualFile.refresh(false, false)
+                // Eagerly load content so objectMissing is set before opening the editor
+                virtualFile.contentsToByteArray()
+
                 SwingUtilities.invokeLater {
                     FileEditorManager.getInstance(project).openFile(virtualFile, true)
+                    // Update editor notifications in case objectMissing state changed
+                    EditorNotifications.getInstance(project).updateNotifications(virtualFile)
                 }
             } catch (e: Exception) {
                 log.warn("Failed to open file: ${node.path}", e)

@@ -9,6 +9,7 @@ import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.fileTypes.UnknownFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.*
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import java.io.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -137,6 +138,10 @@ class S3VirtualFile(
     @Volatile
     private var dirty = false
 
+    @Volatile
+    var objectMissing = false
+        private set
+
     override fun getName(): String = key.substringAfterLast('/')
 
     override fun getFileSystem(): VirtualFileSystem = fileSystem
@@ -180,12 +185,25 @@ class S3VirtualFile(
 
         return try {
             val content = S3ClientService.getInstance().getObjectContent(instanceId, bucketName, key)
+            objectMissing = false
             cachedContent = content
             content
         } catch (e: Exception) {
             log.warn("Failed to load content for $path", e)
+            if (hasCause<NoSuchKeyException>(e)) {
+                objectMissing = true
+            }
             ByteArray(0)
         }
+    }
+
+    private inline fun <reified T : Throwable> hasCause(e: Throwable): Boolean {
+        var cause: Throwable? = e
+        while (cause != null) {
+            if (cause is T) return true
+            cause = cause.cause
+        }
+        return false
     }
 
     override fun getTimeStamp(): Long = modificationStamp
